@@ -1,0 +1,11 @@
+node_modules/
+dist/
+reports/
+.env
+.env.local
+config.yaml
+*.log
+.DS_Store
+playwright-report/
+test-results/
+grafana/provisioning/alerting/contact-points.yaml

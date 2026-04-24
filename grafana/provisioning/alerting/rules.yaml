@@ -1,0 +1,84 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: improntad-site-health
+    folder: Improntad
+    interval: 1m
+    rules:
+
+      # Fires after 2 consecutive failed healthchecks (interval: 10m → pending: 20m)
+      - uid: site-down
+        isPaused: true
+        title: Site Down
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: healthcheck_up == 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 20m
+        annotations:
+          summary: "{{ $labels.site }} is not responding"
+          description: "Healthcheck has been failing for at least 20 minutes (2 consecutive checks)."
+        labels:
+          severity: critical
+
+      # Fires after 2 consecutive checks with selector failures (interval: 10m → pending: 20m)
+      - uid: selector-failures
+        isPaused: true
+        title: Selector Failures
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: healthcheck_selector_failures > 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 20m
+        annotations:
+          summary: "{{ $labels.site }}: selector failures detected on {{ $labels.page }}"
+          description: "{{ $value }} selector(s) failing for at least 20 minutes (2 consecutive checks)."
+        labels:
+          severity: warning
+
+      # Fires after 2 consecutive Lighthouse runs with poor LCP (interval: 360m → pending: 720m)
+      # Re-enable once hero-v2 is deployed across all carousel sites.
+      - uid: poor-lcp
+        title: Poor LCP
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: lighthouse_lcp_seconds > 4
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 720m
+        isPaused: true
+        annotations:
+          summary: "{{ $labels.site }} LCP is degraded"
+          description: "LCP has been above 4s for 2 consecutive Lighthouse runs ({{ $value | printf \"%.1f\" }}s)."
+        labels:
+          severity: warning

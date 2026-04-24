@@ -1,0 +1,39 @@
+project:
+  name: my-healthchecks        # used in User-Agent, metrics job label, and alert rule names
+
+runner:
+  workers: 3                   # number of sites checked concurrently
+  pageDelayMs: 0               # ms to wait between page requests within a site (0 = disabled)
+  metricsPort: 9464            # port for the Prometheus /metrics endpoint
+  metricsSink: prometheus      # prometheus | stdout
+  sitesDir: ./sites            # directory containing site YAML files
+  reportsDir: ./reports        # directory where Lighthouse HTML/JSON reports are saved
+  logLevel: info               # trace | debug | info | warn | error | fatal
+  schedulerTickMs: 1000        # how often the scheduler checks for due tasks (ms)
+  lighthouseStartDelayMs: 30000  # delay before the first Lighthouse run after startup (ms)
+
+healthcheck:
+  defaultIntervalMinutes: 10   # how often to run healthchecks (per-site YAML can override)
+  defaultTimeoutSeconds: 30    # page navigation timeout
+  selectorTimeoutMs: 5000      # per-selector visibility check timeout
+  forceCloseTimeoutMs: 5000    # browser force-close timeout on error
+
+lighthouse:
+  defaultIntervalMinutes: 360  # how often to run Lighthouse audits (6 hours)
+  defaultThrottling: mobile    # mobile | desktop
+  desktopWidth: 1350
+  desktopHeight: 940
+  forceCloseTimeoutMs: 5000
+
+watcher:
+  stabilityThreshold: 250      # ms a site YAML must be stable before reloading
+  pollInterval: 50             # chokidar poll interval (ms)
+
+alerting:
+  siteDownMinutes: 20          # alert if site has been down for this long
+  selectorFailMinutes: 20      # alert if selector failures persist for this long
+  poorLcpSeconds: 4            # alert if LCP exceeds this threshold
+  queryRangeSeconds: 600       # Prometheus query look-back window
+  groupWaitSeconds: 30         # Grafana alerting: initial wait before firing
+  groupIntervalMinutes: 5      # Grafana alerting: re-evaluation interval
+  repeatIntervalHours: 4       # Grafana alerting: re-notify interval

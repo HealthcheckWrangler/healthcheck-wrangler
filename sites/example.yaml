@@ -1,0 +1,66 @@
+name: example-site
+baseUrl: https://example.com
+alerting: true
+
+healthcheck:
+  enabled: false              # set to true once selectors are validated
+  intervalMinutes: 10
+  timeoutSeconds: 30
+
+lighthouse:
+  enabled: false              # set to true once healthcheck is passing
+  intervalMinutes: 360
+  throttling: mobile          # mobile | desktop
+
+pages:
+  - path: /
+    name: Home
+    selectors:
+      - "nav"                 # replace with site-specific selectors
+      - "main"
+
+  - path: /contact/
+    name: Contact
+    selectors:
+      - "nav"
+      - "form"
+
+# API checks — not yet implemented, schema reserved for future use
+# api:
+#   enabled: false
+#   intervalMinutes: 5
+#   checks:
+#     - path: /api/health
+#       name: Health endpoint
+#       method: GET
+#       expectedStatus: 200
+#       latencyThresholdMs: 500
+#
+#     - path: /api/login
+#       name: Login smoke test
+#       method: POST
+#       headers:
+#         Content-Type: application/json
+#       body:
+#         inline: '{"username": "probe", "password": "probe"}'
+#       expectedStatus: 200
+#       latencyThresholdMs: 1000
+#       assertions:
+#         - type: json
+#           path: "$.token"
+#           exists: true
+#
+#     - path: /api/orders
+#       name: Create order
+#       method: POST
+#       headers:
+#         Authorization: "Bearer ${API_PROBE_TOKEN}"
+#       body:
+#         file: ./payloads/create-order.json
+#       expectedStatus: 201
+#       assertions:
+#         - type: json
+#           path: "$.id"
+#           exists: true
+#       expectedResponse:
+#         file: ./expected/create-order.json

@@ -1,0 +1,21 @@
+// Grafana Alloy config: scrape the runner's /metrics and remote_write to Grafana Cloud.
+// Docs: https://grafana.com/docs/alloy/latest/
+
+prometheus.scrape "runner" {
+  targets = [
+    { "__address__" = "runner:9464", "job" = sys.env("HCW_PROJECT_NAME") },
+  ]
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+  scrape_interval = "60s"
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    name = "hosted-prometheus"
+    url = sys.env("GRAFANA_CLOUD_PROM_URL")
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROM_USERNAME")
+      password = sys.env("GRAFANA_CLOUD_PROM_PASSWORD")
+    }
+  }
+}
