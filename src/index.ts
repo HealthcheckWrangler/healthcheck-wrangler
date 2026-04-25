@@ -87,7 +87,7 @@ async function main(): Promise<void> {
   const reportsDir = resolve(config.runner.reportsDir);
   const sink = config.runner.metricsSink as MetricsSink;
 
-  logger.info({ sitesDir, reportsDir, sink, workers: config.runner.workers }, "starting runner");
+  logger.info({ sitesDir, reportsDir, sink, workers: config.runner.workers, version: process.env.HCW_VERSION ?? "dev" }, "starting runner");
 
   const metrics = new MetricsRegistry();
   const store = new ConfigStore(sitesDir, config);

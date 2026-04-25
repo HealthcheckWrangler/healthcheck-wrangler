@@ -12,7 +12,9 @@ COPY config.yaml.example ./config.yaml
 
 RUN npm run build && npm prune --omit=dev
 
+ARG BUILD_VERSION=dev
 ENV NODE_ENV=production
+ENV HCW_VERSION=${BUILD_VERSION}
 
 EXPOSE 9464
 
