@@ -23,14 +23,22 @@
     "hcw": "tsx src/cli/index.ts",
     "dashboards:push": "tsx --env-file=.env scripts/sync-dashboards.ts",
     "alerting:push": "tsx --env-file=.env scripts/sync-alerting.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "release": "release-it",
+    "commit": "cz",
+    "prepare": "husky"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
   },
   "dependencies": {
     "@inquirer/prompts": "^8.4.2",
-    "dotenv": "^16.4.5",
     "chalk": "^5.3.0",
     "chokidar": "^3.6.0",
     "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
     "lighthouse": "^12.2.1",
     "node-cron": "^3.0.3",
     "pino": "^9.4.0",
@@ -41,8 +49,15 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@release-it/conventional-changelog": "^11.0.0",
     "@types/node": "^22.5.0",
     "@types/node-cron": "^3.0.11",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "husky": "^9.1.7",
+    "release-it": "^20.0.1",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4"
   }
