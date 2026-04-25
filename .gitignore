@@ -6,6 +6,7 @@ reports/
 config.yaml
 *.log
 .DS_Store
+.npmrc
 playwright-report/
 test-results/
 grafana/provisioning/alerting/contact-points.yaml

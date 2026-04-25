@@ -61,6 +61,12 @@ class Scheduler {
     task.nextRun = Date.now() + task.intervalMs;
   }
 
+  nextDue(): { task: ScheduledTask; at: number } | null {
+    if (this.tasks.length === 0) return null;
+    const soonest = this.tasks.reduce((a, b) => (a.nextRun < b.nextRun ? a : b));
+    return { task: soonest, at: soonest.nextRun };
+  }
+
   stop(): void {
     this.stopping = true;
   }
@@ -116,6 +122,7 @@ async function main(): Promise<void> {
   }
 
   const inFlight = new Map<string, Promise<void>>();
+  let idleLoggedAt = 0;
 
   const runTask = (task: ScheduledTask): Promise<void> => {
     const site = store.get(task.site);
@@ -172,18 +179,38 @@ async function main(): Promise<void> {
     const now = Date.now();
     const due = scheduler.due(now);
 
+    const lighthouseRunning = [...inFlight.keys()].some((k) => k.startsWith("lighthouse:"));
+
+    let dispatched = 0;
     for (const task of due) {
       const key = `${task.type}:${task.site}`;
       if (inFlight.has(key)) continue;
+      if (task.type === "lighthouse" && lighthouseRunning) continue;
       if (inFlight.size >= config.runner.workers) break;
 
+      logger.info({ site: task.site, type: task.type, workers: inFlight.size + 1 }, "task started");
       const promise = runTask(task)
-        .catch((err) => logger.error({ err, task }, "task failed"))
+        .catch((err) => logger.error({ err, site: task.site, page: task.type }, "task failed"))
         .finally(() => {
           inFlight.delete(key);
           scheduler.markRan(task);
+          logger.info({ site: task.site, type: task.type }, "task complete");
         });
       inFlight.set(key, promise);
+      dispatched++;
+      idleLoggedAt = 0;
+    }
+
+    if (dispatched === 0 && due.length === 0 && now - idleLoggedAt > 60_000) {
+      const next = scheduler.nextDue();
+      if (next) {
+        const inSec = Math.round(Math.max(0, next.at - now) / 1000);
+        logger.info(
+          { nextSite: next.task.site, nextType: next.task.type, inSeconds: inSec },
+          "idle — next task scheduled",
+        );
+        idleLoggedAt = now;
+      }
     }
 
     await sleep(config.runner.schedulerTickMs);

@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 /**
  * Pushes the PagerDuty contact point, alert rules, and notification policy
  * to Grafana Cloud via the HTTP API.
@@ -8,6 +8,8 @@
  *   GRAFANA_CLOUD_API_TOKEN    Grafana Cloud API token with Editor role
  *   PAGERDUTY_INTEGRATION_KEY  PagerDuty Events API v2 integration key
  */
+import { config as loadDotenv } from "dotenv";
+loadDotenv();
 import chalk from "chalk";
 import { loadRuntimeConfig } from "../src/runtime-config.js";
 

@@ -1,23 +1,47 @@
+# Site name — kebab-case, must match the filename (dr-garcia.yaml → name: dr-garcia).
+# Used in metric labels, log output, and Grafana dashboards.
 name: example-site
+
+# Root URL of the site. All page paths below are resolved relative to this.
 baseUrl: https://example.com
+
+# Whether to fire PagerDuty / Grafana alerts for this site.
+# Set to false to monitor silently while a site is being onboarded.
 alerting: true
 
 healthcheck:
-  enabled: false              # set to true once selectors are validated
+  # Master switch. Keep false until you've validated selectors with `hcw check --site <name>`.
+  enabled: false
+
+  # How often to run the healthcheck. Overrides healthcheck.defaultIntervalMinutes in config.yaml.
   intervalMinutes: 10
+
+  # Page navigation timeout in seconds. Overrides healthcheck.defaultTimeoutSeconds in config.yaml.
   timeoutSeconds: 30
 
 lighthouse:
-  enabled: false              # set to true once healthcheck is passing
-  intervalMinutes: 360
-  throttling: mobile          # mobile | desktop
+  # Master switch. Enable only after healthcheck is passing cleanly.
+  enabled: false
 
+  # How often to run a full Lighthouse audit. 360 = every 6 hours.
+  intervalMinutes: 360
+
+  # Throttling profile. mobile simulates a mid-tier phone on slow 3G.
+  # desktop uses the dimensions set in config.yaml (lighthouse.desktopWidth/Height).
+  throttling: mobile  # mobile | desktop
+
+# Pages to monitor. Each page gets its own healthcheck and Lighthouse audit.
 pages:
   - path: /
+    # Human-readable label used in logs, metrics, and Grafana dashboards.
     name: Home
+    # CSS selectors that must be visible for the page to be considered healthy.
+    # Use browser DevTools to find stable selectors — prefer semantic elements or
+    # stable class names over auto-generated ones. At least one selector is required.
     selectors:
-      - "nav"                 # replace with site-specific selectors
+      - "nav"    # replace with real selectors for this site
       - "main"
+      - "footer"
 
   - path: /contact/
     name: Contact
@@ -25,7 +49,7 @@ pages:
       - "nav"
       - "form"
 
-# API checks — not yet implemented, schema reserved for future use
+# API checks — not yet implemented, schema reserved for future use.
 # api:
 #   enabled: false
 #   intervalMinutes: 5

@@ -1,0 +1,27 @@
+services:
+  runner:
+    image: ghcr.io/healthcheckwrangler/healthcheck-wrangler:latest
+    container_name: hcw-runner
+    restart: unless-stopped
+    env_file: .env
+    shm_size: '256m'
+    volumes:
+      - ./sites:/app/sites:ro
+      - ./reports:/app/reports
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "9464:9464"
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: hcw-alloy
+    restart: unless-stopped
+    env_file: .env
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - runner

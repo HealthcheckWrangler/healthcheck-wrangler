@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 /**
  * Uploads every JSON file in dashboards/ to Grafana Cloud via the HTTP API.
  *
@@ -6,9 +6,12 @@
  *   GRAFANA_CLOUD_URL        https://your-stack.grafana.net
  *   GRAFANA_CLOUD_API_TOKEN  a Grafana Cloud API token with Editor role
  */
+import { config as loadDotenv } from "dotenv";
+loadDotenv();
 import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import chalk from "chalk";
+import { loadRuntimeConfig } from "../src/runtime-config.js";
 
 const url = process.env.GRAFANA_CLOUD_URL;
 const token = process.env.GRAFANA_CLOUD_API_TOKEN;
@@ -22,8 +25,9 @@ if (!url || !token) {
   process.exit(1);
 }
 
+const runtimeConfig = loadRuntimeConfig();
 const dashboardsDir = resolve("dashboards");
-const FOLDER_TITLE = "Improntad";
+const FOLDER_TITLE = runtimeConfig.project.name;
 
 async function ensureFolder(): Promise<string> {
   const res = await fetch(`${url}/api/folders`, {
