@@ -1,6 +1,6 @@
 {
   "name": "@healthcheckwrangler/hcw",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Playwright + Lighthouse site monitoring with Prometheus metrics.",
   "type": "module",
   "engines": {
