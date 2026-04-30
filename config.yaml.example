@@ -1,16 +1,24 @@
 project:
-  name: my-healthchecks        # used in User-Agent, metrics job label, and alert rule names
+  name: my-healthchecks        # used in User-Agent string and Prometheus job label
 
 runner:
   workers: 3                   # number of sites checked concurrently
   pageDelayMs: 0               # ms to wait between page requests within a site (0 = disabled)
-  metricsPort: 9464            # port for the Prometheus /metrics endpoint
-  metricsSink: prometheus      # prometheus | stdout
+  metricsSink: none            # none (default) | prometheus (expose /metrics) | stdout
+  metricsPort: 9464            # port for the Prometheus /metrics endpoint (used when metricsSink: prometheus)
   sitesDir: ./sites            # directory containing site YAML files
-  reportsDir: ./reports        # directory where Lighthouse HTML/JSON reports are saved
+  reportsDir: ./reports        # directory where Lighthouse HTML/JSON report files are saved
   logLevel: info               # trace | debug | info | warn | error | fatal
   schedulerTickMs: 1000        # how often the scheduler checks for due tasks (ms)
   lighthouseStartDelayMs: 30000  # delay before the first Lighthouse run after startup (ms)
+
+  # Dashboard API — set apiPort: 0 to disable
+  apiPort: 8080                # port for the runner's internal REST + SSE API
+
+  # Retention (requires DATABASE_URL env var to be set)
+  logRetentionDays: 7          # log entries older than this are dropped automatically by TimescaleDB
+  resultsRetentionDays: 180    # healthcheck + lighthouse result history retention (6 months)
+  lighthouseReportRetentionDays: 7  # delete Lighthouse HTML/JSON report files from disk after N days
 
 healthcheck:
   defaultIntervalMinutes: 10   # how often to run healthchecks (per-site YAML can override)
@@ -30,6 +38,25 @@ watcher:
   pollInterval: 50             # chokidar poll interval (ms)
 
 alerting:
+  # Native channel-based alerting — fires on state transitions (up→down, down→up)
+  channels:
+    - type: google-chat
+      name: Ops              # optional label for logs
+      webhookUrl: "https://chat.googleapis.com/v1/spaces/SPACE/messages?key=KEY&token=TOKEN"
+      on:                    # events to send — omit the list to receive all
+        - site-down
+        - site-recovery
+        - high-memory        # RAM > 85%
+        - memory-recovered
+        - high-load          # CPU load > 90% of core count
+        - load-recovered
+  # Uncomment to add more channels, e.g. a separate space for critical alerts only:
+  # - type: google-chat
+  #   name: Critical
+  #   webhookUrl: "https://chat.googleapis.com/..."
+  #   on: [site-down]
+
+  # Only used with --profile self-hosted or --profile grafana-cloud (Prometheus alerting path)
   siteDownMinutes: 20          # alert if site has been down for this long
   selectorFailMinutes: 20      # alert if selector failures persist for this long
   poorLcpSeconds: 4            # alert if LCP exceeds this threshold

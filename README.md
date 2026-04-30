@@ -1,39 +1,42 @@
 # HealthcheckWrangler
 
-Playwright-based site monitoring with Lighthouse audits and Prometheus metrics. Checks that key page elements are visible, measures Core Web Vitals, and alerts via PagerDuty when things go wrong.
+Playwright-based site monitoring with Lighthouse audits, a built-in status dashboard, and persistent storage via TimescaleDB. Checks that key page elements are visible, measures Core Web Vitals, and stores everything in a queryable database with a real-time web UI.
 
 ## How it works
 
 The runner loads site configs from a `sites/` directory. For each site it:
 
-1. **Healthcheck** — opens each page in a headless Chromium browser and verifies that configured CSS selectors are visible. Reports `healthcheck_up`, `healthcheck_duration_seconds`, and `healthcheck_selector_failures` metrics.
-2. **Lighthouse audit** — runs a full Lighthouse audit on each page and reports `lighthouse_performance_score`, `lighthouse_lcp_seconds`, `lighthouse_fcp_seconds`, `lighthouse_tbt_seconds`, and `lighthouse_cls` metrics.
+1. **Healthcheck** — opens each page in headless Chromium and verifies that configured CSS selectors are visible. Results are stored in TimescaleDB and surfaced in the dashboard.
+2. **Lighthouse audit** — runs a full Lighthouse audit on each page and records performance, accessibility, best practices, SEO scores, and all Core Web Vitals.
 
-Metrics are exposed on `:9464/metrics` in Prometheus format.
+A built-in React dashboard (`:3001`) shows real-time status, fleet timelines, per-site availability history, Lighthouse scores, and a structured log viewer. TimescaleDB stores 6 months of check results and 7 days of logs by default.
 
 ---
 
-## Deployment modes
-
-### Grafana Cloud
-
-Metrics are scraped by [Grafana Alloy](https://grafana.com/docs/alloy/) and shipped to Grafana Cloud via remote_write. Alerts are sent to PagerDuty.
+## Default stack
 
 ```bash
-docker compose -f docker-compose.cloud.yml up -d
+docker compose up -d
 ```
 
-Requires Grafana Cloud credentials in `.env` (see `.env.example`).
+Starts three services:
+- **TimescaleDB** — persistent storage (internal only, not exposed to host)
+- **runner** — Playwright checks + Lighthouse audits + API server on `:8080`
+- **dashboard** — React UI on `:3001`, proxies to runner API
 
-### Self-hosted
+Open `http://localhost:3001` to see the dashboard.
 
-Prometheus scrapes the runner and Grafana visualizes the data — no external accounts needed.
+## Opt-in: Prometheus metrics
+
+If you want to forward metrics to Grafana Cloud or a self-hosted Prometheus stack, set `metricsSink: prometheus` in `config.yaml` and add the appropriate profile:
 
 ```bash
-docker compose -f docker-compose.self-hosted.yml up -d
-```
+# Self-hosted Prometheus + Grafana
+docker compose --profile self-hosted up -d
 
-Grafana is available at `http://localhost:3000` (admin / admin). Dashboards are provisioned automatically from the `dashboards/` directory.
+# Grafana Cloud via Alloy
+docker compose --profile grafana-cloud up -d
+```
 
 ---
 
@@ -47,6 +50,7 @@ cd healthcheck-wrangler
 # 2. Copy and edit config
 cp config.yaml.example config.yaml
 cp .env.example .env
+# Set DB_PASSWORD in .env
 
 # 3. Add your first site
 npm install
@@ -56,9 +60,7 @@ npx hcw add-site
 npx hcw check --site <your-site>
 
 # 5. Start the stack
-docker compose -f docker-compose.self-hosted.yml up -d   # self-hosted
-# or
-docker compose -f docker-compose.cloud.yml up -d          # Grafana Cloud
+docker compose up -d
 ```
 
 ---
@@ -157,39 +159,25 @@ Options:
   --timeout <ms>   navigation timeout in milliseconds (default: 30000)
 ```
 
-### `hcw-dashboards-push`
-
-Upload all JSON files in `./dashboards` to Grafana Cloud. Requires `GRAFANA_CLOUD_URL` and `GRAFANA_CLOUD_API_TOKEN` in `.env`.
-
-### `hcw-alerting-push`
-
-Push PagerDuty contact point, alert rules, and notification policy to Grafana Cloud. Requires `GRAFANA_CLOUD_URL`, `GRAFANA_CLOUD_API_TOKEN`, and `PAGERDUTY_INTEGRATION_KEY` in `.env`.
-
 ---
 
 ## Configuration reference
 
-See [`config.yaml.example`](config.yaml.example) for all available options with inline documentation.
-
-Key sections:
+See [`config.yaml.example`](config.yaml.example) for all options with inline documentation.
 
 | Section | What it controls |
 |---|---|
-| `project.name` | Label used in metrics, alerts, and dashboards |
+| `project.name` | Label used in metrics and dashboards |
 | `runner.workers` | Number of sites checked concurrently |
-| `runner.metricsSink` | `prometheus` (expose `/metrics`) or `stdout` (log JSON) |
+| `runner.metricsSink` | `none` (default), `prometheus` (expose `/metrics`), or `stdout` |
+| `runner.apiPort` | Dashboard API port (default `8080`, set to `0` to disable) |
+| `runner.logRetentionDays` | How long logs are kept in TimescaleDB (default `7`) |
+| `runner.resultsRetentionDays` | How long check results are kept (default `180`) |
+| `runner.lighthouseReportRetentionDays` | How long HTML/JSON report files are kept on disk (default `7`) |
 | `healthcheck` | Default intervals and timeouts for healthchecks |
 | `lighthouse` | Default intervals, throttling, and viewport for Lighthouse |
-| `alerting` | Thresholds and timing for Grafana / PagerDuty alerts |
 
----
-
-## Adding dashboards
-
-Place Grafana dashboard JSON exports in the `dashboards/` directory.
-
-- **Self-hosted**: Grafana hot-reloads dashboards from this directory within 10 seconds. Dashboards are editable in the UI.
-- **Grafana Cloud**: run `hcw-dashboards-push` to upload them via the API.
+Database connection is read from the `DATABASE_URL` environment variable. If not set, the runner operates without persistence (in-memory only, no dashboard data).
 
 ---
 
@@ -200,15 +188,48 @@ For production use, create a separate repository that mounts your `sites/` and `
 ```yaml
 # docker-compose.yml in your instance repo
 services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    environment:
+      POSTGRES_DB: hcw
+      POSTGRES_USER: hcw
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hcw"]
+      interval: 10s
+      retries: 5
+
   runner:
     image: ghcr.io/healthcheckwrangler/healthcheck-wrangler:latest
+    environment:
+      DATABASE_URL: postgresql://hcw:${DB_PASSWORD}@timescaledb:5432/hcw
     volumes:
       - ./sites:/app/sites:ro
-      - ./config.yaml:/app/config.yaml:ro
       - ./reports:/app/reports
-    env_file: .env
+      - ./config.yaml:/app/config.yaml:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+
+  dashboard:
+    image: ghcr.io/healthcheckwrangler/healthcheck-wrangler:latest
+    command: ["node", "--enable-source-maps", "dist/src/dashboard/server.js"]
+    environment:
+      RUNNER_API_URL: http://runner:8080
+      DASHBOARD_PORT: "3001"
     ports:
-      - "9464:9464"
+      - "3001:3001"
+    depends_on:
+      - runner
+
+volumes:
+  timescaledb-data:
 ```
 
-This keeps your site configs versioned separately from the engine, and lets you pull engine updates with `docker compose pull`.
+This keeps your site configs versioned separately from the engine. Pull engine updates with:
+
+```bash
+docker compose pull && docker compose up -d
+```
