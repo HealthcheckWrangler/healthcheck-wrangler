@@ -115,7 +115,7 @@ export async function runLighthouse(
       return typeof value === "number" ? value : 0;
     };
 
-    return {
+    const result = {
       site: site.name,
       page: page.name,
       timestamp,
@@ -137,6 +137,20 @@ export async function runLighthouse(
       reportHtmlPath: htmlPath,
       reportJsonPath: jsonPath,
     };
+
+    logger.info(
+      {
+        site: result.site,
+        page: result.page,
+        perf: result.scores.performance,
+        a11y: result.scores.accessibility,
+        seo: result.scores.seo,
+        lcp: `${result.metrics.lcp_seconds.toFixed(2)}s`,
+      },
+      "lighthouse complete",
+    );
+
+    return result;
   } catch (err) {
     logger.error({ err, site: site.name, page: page.name }, "lighthouse failed");
     return null;
