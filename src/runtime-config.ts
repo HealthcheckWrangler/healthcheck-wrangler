@@ -14,12 +14,17 @@ const RunnerSchema = z
     workers: z.number().int().positive().default(3),
     pageDelayMs: z.number().int().min(0).default(0),
     metricsPort: z.number().int().positive().default(9464),
-    metricsSink: z.enum(["prometheus", "stdout"]).default("prometheus"),
+    metricsSink: z.enum(["prometheus", "stdout", "none"]).default("none"),
     sitesDir: z.string().default("./sites"),
     reportsDir: z.string().default("./reports"),
     logLevel: z.string().default("info"),
     schedulerTickMs: z.number().int().positive().default(1000),
     lighthouseStartDelayMs: z.number().int().min(0).default(30_000),
+    // Dashboard API — always on by default (set to 0 to disable)
+    apiPort: z.number().int().min(0).default(8080),
+    logRetentionDays: z.number().int().positive().default(7),
+    resultsRetentionDays: z.number().int().positive().default(180),
+    lighthouseReportRetentionDays: z.number().int().positive().default(7),
   })
   .default({});
 
@@ -49,8 +54,28 @@ const WatcherSchema = z
   })
   .default({});
 
+const AlertEventTypeSchema = z.enum([
+  "site-down",
+  "site-recovery",
+  "high-memory",
+  "memory-recovered",
+  "high-load",
+  "load-recovered",
+]);
+
+const GoogleChatChannelSchema = z.object({
+  type: z.literal("google-chat"),
+  name: z.string().optional(),
+  webhookUrl: z.string().url(),
+  on: z.array(AlertEventTypeSchema).default(["site-down", "site-recovery"]),
+});
+
+const ChannelSchema = z.discriminatedUnion("type", [GoogleChatChannelSchema]);
+
 const AlertingSchema = z
   .object({
+    channels: z.array(ChannelSchema).default([]),
+    // Legacy fields — used only with --profile self-hosted / grafana-cloud (Prometheus alertmanager)
     siteDownMinutes: z.number().int().positive().default(20),
     selectorFailMinutes: z.number().int().positive().default(20),
     poorLcpSeconds: z.number().positive().default(4),
