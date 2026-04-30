@@ -1,0 +1,115 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: hcw-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hcw
+      POSTGRES_USER: hcw
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hcw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  runner:
+    image: ghcr.io/healthcheckwrangler/healthcheck-wrangler:latest
+    container_name: hcw-runner
+    restart: unless-stopped
+    env_file: .env
+    shm_size: '1gb'
+    environment:
+      DATABASE_URL: postgresql://hcw:${DB_PASSWORD}@timescaledb:5432/hcw
+    volumes:
+      - ./sites:/app/sites:ro
+      - ./reports:/app/reports
+      - ./config.yaml:/app/config.yaml:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+
+  dashboard:
+    image: ghcr.io/healthcheckwrangler/healthcheck-wrangler:latest
+    container_name: hcw-dashboard
+    restart: unless-stopped
+    command: ["node", "--enable-source-maps", "dist/src/dashboard/server.js"]
+    environment:
+      RUNNER_API_URL: http://runner:8080
+      DASHBOARD_PORT: "3001"
+    ports:
+      - "3001:3001"
+    depends_on:
+      - runner
+
+  # Optional: Cloudflare Tunnel for external access without port forwarding
+  # Requires CLOUDFLARE_TUNNEL_TOKEN in .env
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: hcw-cloudflared
+  #   restart: unless-stopped
+  #   command: tunnel --no-autoupdate run
+  #   environment:
+  #     TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+  #   depends_on:
+  #     - dashboard
+
+  # --- opt-in: docker compose --profile self-hosted up ---
+  prometheus:
+    profiles: [self-hosted]
+    image: prom/prometheus:latest
+    container_name: hcw-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - runner
+
+  grafana:
+    profiles: [self-hosted]
+    image: grafana/grafana-oss:latest
+    container_name: hcw-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  # --- opt-in: docker compose --profile grafana-cloud up ---
+  alloy:
+    profiles: [grafana-cloud]
+    image: grafana/alloy:latest
+    container_name: hcw-alloy
+    restart: unless-stopped
+    env_file: .env
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - runner
+
+volumes:
+  timescaledb-data:
+  prometheus-data:
+  grafana-data:
