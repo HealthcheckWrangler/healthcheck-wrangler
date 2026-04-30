@@ -181,6 +181,33 @@ Database connection is read from the `DATABASE_URL` environment variable. If not
 
 ---
 
+## Alerting
+
+Built-in channel-based alerting fires on state transitions only — once when a site goes down, once when it recovers. No repeated notifications while a site stays down.
+
+Configure channels in `config.yaml`:
+
+```yaml
+alerting:
+  channels:
+    - type: google-chat
+      name: Ops
+      webhookUrl: "https://chat.googleapis.com/v1/spaces/..."
+      on:
+        - site-down
+        - site-recovery
+        - high-memory      # host RAM > 85%
+        - memory-recovered
+        - high-load        # load avg > 90% of CPU core count
+        - load-recovered
+```
+
+Multiple channels are supported. Each subscribes to its own `on` event list. Per-site opt-out: set `alerting: false` in the site YAML.
+
+Resource metrics (RAM, CPU load) are sampled every 60 seconds by the runner regardless of dashboard usage.
+
+---
+
 ## Instance pattern
 
 For production use, create a separate repository that mounts your `sites/` and `config.yaml` into the published Docker image:
