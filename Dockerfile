@@ -10,7 +10,7 @@ COPY src ./src
 COPY scripts ./scripts
 COPY config.yaml.example ./config.yaml
 
-RUN npm run build && npm prune --omit=dev
+RUN npm run build && npm run build:ui && npm prune --omit=dev
 
 ARG BUILD_VERSION=dev
 ENV NODE_ENV=production

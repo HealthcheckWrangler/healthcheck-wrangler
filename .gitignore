@@ -1,6 +1,8 @@
 node_modules/
 dist/
 reports/
+data/
+src/dashboard/ui/dist/
 .env
 .env.local
 config.yaml
