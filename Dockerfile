@@ -7,7 +7,6 @@ RUN npm install && npm cache clean --force
 
 COPY tsconfig.json ./
 COPY src ./src
-COPY scripts ./scripts
 COPY config.yaml.example ./config.yaml
 
 RUN npm run build && npm run build:ui && npm prune --omit=dev
@@ -15,7 +14,5 @@ RUN npm run build && npm run build:ui && npm prune --omit=dev
 ARG BUILD_VERSION=dev
 ENV NODE_ENV=production
 ENV HCW_VERSION=${BUILD_VERSION}
-
-EXPOSE 9464
 
 CMD ["node", "--enable-source-maps", "dist/src/index.js"]
