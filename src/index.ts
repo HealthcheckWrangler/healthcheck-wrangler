@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { readdir, stat, unlink } from "node:fs/promises";
+import { readdir, rmdir, stat, unlink } from "node:fs/promises";
 import * as os from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
@@ -30,6 +30,9 @@ async function purgeOldReports(reportsDir: string, retentionDays: number): Promi
         if (!s) continue;
         if (s.isDirectory()) {
           await walk(full);
+          // Remove directory if it is now empty
+          const remaining = await readdir(full).catch(() => null);
+          if (remaining?.length === 0) await rmdir(full).catch(() => {});
         } else if (s.mtimeMs < cutoff) {
           await unlink(full).catch(() => {});
           deleted++;
