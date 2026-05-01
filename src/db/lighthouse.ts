@@ -100,3 +100,19 @@ export async function getLighthouseHistory(
     LIMIT ${limit}
   `;
 }
+
+export async function getLighthouseHistoryForRange(
+  sql: postgres.Sql,
+  site: string,
+  startMs: number,
+  endMs: number,
+): Promise<StoredLighthouse[]> {
+  return sql<StoredLighthouse[]>`
+    SELECT ts, site, page, perf, a11y, best_practices, seo,
+           lcp, fcp, tbt, cls, ttfb, speed_index, report_url
+    FROM lighthouse_results
+    WHERE site = ${site}
+      AND ts BETWEEN ${new Date(startMs)} AND ${new Date(endMs)}
+    ORDER BY ts ASC
+  `;
+}

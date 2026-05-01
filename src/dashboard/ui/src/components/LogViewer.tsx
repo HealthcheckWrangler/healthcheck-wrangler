@@ -253,7 +253,7 @@ export function LogViewer({ site }: LogViewerProps) {
       </div>
 
       {/* Log list */}
-      <div ref={containerRef} onScroll={onScroll} className="flex-1 overflow-y-auto font-mono text-[12px]">
+      <div ref={containerRef} onScroll={onScroll} className="flex-1 overflow-auto font-mono text-[12px]">
         {histLoading && histEntries.length === 0 && (
           <div className="flex h-40 items-center justify-center text-[hsl(var(--muted-foreground))]">
             Loading…
@@ -287,7 +287,7 @@ export function LogViewer({ site }: LogViewerProps) {
                 isExpanded && "bg-[hsl(var(--accent)/0.5)]",
               )}
             >
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2 min-w-max">
                 <span className="shrink-0 text-[hsl(var(--muted-foreground))]">
                   {new Date(entry.ts).toLocaleTimeString()}
                 </span>
@@ -297,7 +297,7 @@ export function LogViewer({ site }: LogViewerProps) {
                     {entry.site}
                   </span>
                 )}
-                <span className="flex-1 break-all text-[hsl(var(--foreground))]">{entry.msg}</span>
+                <span className="flex-1 whitespace-nowrap text-[hsl(var(--foreground))]">{entry.msg}</span>
                 <span className="shrink-0 text-[hsl(var(--muted-foreground))] text-[10px]">
                   {fmtRelative(entry.ts)}
                 </span>

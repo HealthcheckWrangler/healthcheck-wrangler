@@ -11,6 +11,7 @@ import {
   getSitePageTimeline,
   getSiteKpiTrend,
 } from "./db/healthchecks.js";
+import { getLighthouseHistoryForRange } from "./db/lighthouse.js";
 
 interface ApiDeps {
   scheduler: Scheduler;
@@ -271,6 +272,29 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): 
       checksUp: pt.checks_up,
       checksTotal: pt.checks_total,
       avgDuration: pt.avg_duration,
+    })));
+    return;
+  }
+
+  const lhHistoryMatch = path.match(/^\/api\/sites\/([^/]+)\/lighthouse-history$/);
+  if (lhHistoryMatch?.[1]) {
+    const site = decodeURIComponent(lhHistoryMatch[1]);
+    const p = url.searchParams;
+    const startMs = p.has("startMs") ? Number(p.get("startMs")) : Date.now() - 7 * 86_400_000;
+    const endMs   = p.has("endMs")   ? Number(p.get("endMs"))   : Date.now();
+    const rows = await getLighthouseHistoryForRange(deps.sql, site, startMs, endMs);
+    json(res, rows.map((r) => ({
+      page:  r.page,
+      ts:    r.ts instanceof Date ? r.ts.getTime() : Number(r.ts),
+      perf:  r.perf  ?? -1,
+      a11y:  r.a11y  ?? -1,
+      bp:    r.best_practices ?? -1,
+      seo:   r.seo   ?? -1,
+      lcp:   Number(r.lcp  ?? 0),
+      fcp:   Number(r.fcp  ?? 0),
+      ttfb:  Number(r.ttfb ?? 0),
+      cls:   Number(r.cls  ?? 0),
+      tbt:   Number(r.tbt  ?? 0),
     })));
     return;
   }

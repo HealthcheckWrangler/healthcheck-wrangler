@@ -124,6 +124,20 @@ export interface KpiTrendPoint {
   avgDuration: number;
 }
 
+export interface LighthouseHistoryPoint {
+  page: string;
+  ts: number;
+  perf: number;
+  a11y: number;
+  bp: number;
+  seo: number;
+  lcp: number;
+  fcp: number;
+  ttfb: number;
+  cls: number;
+  tbt: number;
+}
+
 export interface SystemStats {
   memory: { totalBytes: number; usedBytes: number };
   cpu: { count: number; load1m: number; load5m: number; load15m: number };
@@ -150,6 +164,8 @@ export const api = {
     get<TimelineSeries[]>(`/api/sites/${encodeURIComponent(name)}/timeline?startMs=${startMs}&endMs=${endMs}`),
   siteKpiTrend: (name: string, startMs: number, endMs: number) =>
     get<KpiTrendPoint[]>(`/api/sites/${encodeURIComponent(name)}/kpi-trend?startMs=${startMs}&endMs=${endMs}`),
+  siteLighthouseHistory: (name: string, startMs: number, endMs: number) =>
+    get<LighthouseHistoryPoint[]>(`/api/sites/${encodeURIComponent(name)}/lighthouse-history?startMs=${startMs}&endMs=${endMs}`),
   logs: async (query: LogQuery = {}): Promise<LogEntry[]> => {
     const params = new URLSearchParams();
     if (query.startMs !== undefined) params.set("startMs", String(query.startMs));

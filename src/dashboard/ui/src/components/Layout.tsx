@@ -1,5 +1,6 @@
+import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Activity, LayoutDashboard, ScrollText, Wifi, WifiOff } from "lucide-react";
+import { Activity, LayoutDashboard, Menu, ScrollText, Wifi, WifiOff, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { RunnerStatus, Site } from "../api";
 import { TimeRangePicker } from "./TimeRangePicker";
@@ -13,11 +14,27 @@ interface LayoutProps {
 export function Layout({ children, status, sites }: LayoutProps) {
   const location = useLocation();
   const isOnline = status !== null;
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => { setIsSidebarOpen(false); }, [location.pathname]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[hsl(var(--background))]">
+      {/* Mobile backdrop */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="flex w-56 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+      <aside className={cn(
+        "flex w-56 flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--card))]",
+        "fixed inset-y-0 left-0 z-50 transition-transform duration-200",
+        "md:static md:translate-x-0",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+      )}>
         {/* Logo */}
         <div className="flex items-center gap-2 border-b border-[hsl(var(--border))] px-4 py-4">
           <Activity className="h-5 w-5 text-[hsl(var(--primary))]" />
@@ -84,7 +101,14 @@ export function Layout({ children, status, sites }: LayoutProps) {
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar with time range picker */}
-        <div className="flex items-center justify-end border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2">
+        <div className="flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2">
+          <button
+            className="md:hidden rounded p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] transition-colors"
+            onClick={() => setIsSidebarOpen((v) => !v)}
+            aria-label="Toggle navigation"
+          >
+            {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
           <TimeRangePicker />
         </div>
         <main className="flex-1 overflow-y-auto">
