@@ -26,20 +26,6 @@ Starts three services:
 
 Open `http://localhost:3001` to see the dashboard.
 
-## Opt-in: Prometheus metrics
-
-If you want to forward metrics to Grafana Cloud or a self-hosted Prometheus stack, set `metricsSink: prometheus` in `config.yaml` and add the appropriate profile:
-
-```bash
-# Self-hosted Prometheus + Grafana
-docker compose --profile self-hosted up -d
-
-# Grafana Cloud via Alloy
-docker compose --profile grafana-cloud up -d
-```
-
----
-
 ## Quick start
 
 ```bash
@@ -167,9 +153,8 @@ See [`config.yaml.example`](config.yaml.example) for all options with inline doc
 
 | Section | What it controls |
 |---|---|
-| `project.name` | Label used in metrics and dashboards |
+| `project.name` | Label used in User-Agent string and logs |
 | `runner.workers` | Number of sites checked concurrently |
-| `runner.metricsSink` | `none` (default), `prometheus` (expose `/metrics`), or `stdout` |
 | `runner.apiPort` | Dashboard API port (default `8080`, set to `0` to disable) |
 | `runner.logRetentionDays` | How long logs are kept in TimescaleDB (default `7`) |
 | `runner.resultsRetentionDays` | How long check results are kept (default `180`) |

@@ -1,6 +1,6 @@
 import { chromium, type Browser, type BrowserContext } from "playwright";
 import type { Site, Page as PageConfig } from "../config.js";
-import type { HealthcheckResult } from "../metrics.js";
+import type { HealthcheckResult } from "../types.js";
 import { logger } from "../logger.js";
 
 export interface SelectorResult {

@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import lighthouse from "lighthouse";
 import type { Site, Page as PageConfig } from "../config.js";
-import type { LighthouseResult } from "../metrics.js";
+import type { LighthouseResult } from "../types.js";
 import { logger } from "../logger.js";
 
 /** Bind a server to port 0 to let the OS pick a free port, then release it. */

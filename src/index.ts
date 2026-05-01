@@ -5,11 +5,6 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { loadRuntimeConfig } from "./runtime-config.js";
 import { ConfigStore, type Site } from "./config.js";
-import {
-  MetricsRegistry,
-  startMetricsServer,
-  type MetricsSink,
-} from "./metrics.js";
 import { logger, initLogDb } from "./logger.js";
 import { runHealthcheck } from "./runner/healthcheck.js";
 import { runLighthouse } from "./runner/lighthouse.js";
@@ -50,7 +45,6 @@ async function main(): Promise<void> {
   const config = loadRuntimeConfig();
   const sitesDir = resolve(config.runner.sitesDir);
   const reportsDir = resolve(config.runner.reportsDir);
-  const sink = config.runner.metricsSink as MetricsSink;
 
   // Database setup (if DATABASE_URL is configured)
   let sql: ReturnType<typeof getClient> | null = null;
@@ -74,14 +68,10 @@ async function main(): Promise<void> {
   // Alert manager (channel-based, state-transition driven)
   const alertManager = new AlertManager(config);
 
-  // Conditional Prometheus metrics
-  const metrics = sink === "prometheus" ? new MetricsRegistry() : null;
-
   logger.info(
     {
       sitesDir,
       reportsDir,
-      sink,
       workers: config.runner.workers,
       version: process.env.HCW_VERSION ?? "dev",
       db: isDatabaseConfigured(),
@@ -96,12 +86,10 @@ async function main(): Promise<void> {
   const applySites = (sites: Site[]): void => {
     const current = new Set(sites.map((s) => s.name));
     for (const site of sites) {
-      metrics?.setAlertingEnabled(site.name, site.alerting);
       knownSites.add(site.name);
     }
     for (const name of knownSites) {
       if (!current.has(name)) {
-        metrics?.dropSite(name);
         knownSites.delete(name);
       }
     }
@@ -114,11 +102,6 @@ async function main(): Promise<void> {
   applySites(initial);
   store.watch();
   logger.info({ sites: initial.length }, "initial sites loaded");
-
-  let stopMetrics: (() => Promise<void>) | null = null;
-  if (metrics) {
-    stopMetrics = startMetricsServer(metrics, config.runner.metricsPort);
-  }
 
   let stopApi: (() => Promise<void>) | null = null;
   if (config.runner.apiPort > 0 && sql && results) {
@@ -179,7 +162,6 @@ async function main(): Promise<void> {
               selectorTimeoutMs: config.healthcheck.selectorTimeoutMs,
               forceCloseTimeoutMs: config.healthcheck.forceCloseTimeoutMs,
             });
-            metrics?.recordHealthcheck(result);
             await results?.recordHealthcheck(result);
             pageResults.push({ page, result });
             if (config.runner.pageDelayMs > 0) await sleep(config.runner.pageDelayMs);
@@ -203,7 +185,6 @@ async function main(): Promise<void> {
           forceCloseTimeoutMs: config.lighthouse.forceCloseTimeoutMs,
         });
         if (result) {
-          metrics?.recordLighthouse(result);
           await results?.recordLighthouse(result);
         }
       }
@@ -218,7 +199,6 @@ async function main(): Promise<void> {
     await store.stop();
     await Promise.allSettled(scheduler.inFlightValues);
     if (stopApi) await stopApi();
-    if (stopMetrics) await stopMetrics();
     await closeClient();
     process.exit(0);
   };

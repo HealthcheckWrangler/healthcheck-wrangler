@@ -1,11 +1,9 @@
 project:
-  name: my-healthchecks        # used in User-Agent string and Prometheus job label
+  name: my-healthchecks        # used in User-Agent string
 
 runner:
   workers: 3                   # number of sites checked concurrently
   pageDelayMs: 0               # ms to wait between page requests within a site (0 = disabled)
-  metricsSink: none            # none (default) | prometheus (expose /metrics) | stdout
-  metricsPort: 9464            # port for the Prometheus /metrics endpoint (used when metricsSink: prometheus)
   sitesDir: ./sites            # directory containing site YAML files
   reportsDir: ./reports        # directory where Lighthouse HTML/JSON report files are saved
   logLevel: info               # trace | debug | info | warn | error | fatal
@@ -55,12 +53,3 @@ alerting:
   #   name: Critical
   #   webhookUrl: "https://chat.googleapis.com/..."
   #   on: [site-down]
-
-  # Only used with --profile self-hosted or --profile grafana-cloud (Prometheus alerting path)
-  siteDownMinutes: 20          # alert if site has been down for this long
-  selectorFailMinutes: 20      # alert if selector failures persist for this long
-  poorLcpSeconds: 4            # alert if LCP exceeds this threshold
-  queryRangeSeconds: 600       # Prometheus query look-back window
-  groupWaitSeconds: 30         # Grafana alerting: initial wait before firing
-  groupIntervalMinutes: 5      # Grafana alerting: re-evaluation interval
-  repeatIntervalHours: 4       # Grafana alerting: re-notify interval

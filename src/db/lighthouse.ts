@@ -1,5 +1,5 @@
 import type postgres from "postgres";
-import type { LighthouseResult } from "../metrics.js";
+import type { LighthouseResult } from "../types.js";
 
 export interface StoredLighthouse {
   ts: Date;

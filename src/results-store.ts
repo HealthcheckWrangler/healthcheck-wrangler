@@ -1,6 +1,6 @@
 import type postgres from "postgres";
 import type { DetailedHealthcheckResult } from "./runner/healthcheck.js";
-import type { LighthouseResult } from "./metrics.js";
+import type { LighthouseResult } from "./types.js";
 import {
   insertHealthcheck,
   getLatestHealthcheck,

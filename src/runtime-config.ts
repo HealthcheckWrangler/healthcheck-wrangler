@@ -13,8 +13,6 @@ const RunnerSchema = z
   .object({
     workers: z.number().int().positive().default(3),
     pageDelayMs: z.number().int().min(0).default(0),
-    metricsPort: z.number().int().positive().default(9464),
-    metricsSink: z.enum(["prometheus", "stdout", "none"]).default("none"),
     sitesDir: z.string().default("./sites"),
     reportsDir: z.string().default("./reports"),
     logLevel: z.string().default("info"),
@@ -75,14 +73,6 @@ const ChannelSchema = z.discriminatedUnion("type", [GoogleChatChannelSchema]);
 const AlertingSchema = z
   .object({
     channels: z.array(ChannelSchema).default([]),
-    // Legacy fields — used only with --profile self-hosted / grafana-cloud (Prometheus alertmanager)
-    siteDownMinutes: z.number().int().positive().default(20),
-    selectorFailMinutes: z.number().int().positive().default(20),
-    poorLcpSeconds: z.number().positive().default(4),
-    queryRangeSeconds: z.number().int().positive().default(600),
-    groupWaitSeconds: z.number().int().positive().default(30),
-    groupIntervalMinutes: z.number().int().positive().default(5),
-    repeatIntervalHours: z.number().int().positive().default(4),
   })
   .default({});
 
