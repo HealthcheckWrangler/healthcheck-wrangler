@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v1.0.0...v2.0.0) (2026-05-01)
+
+### Features
+
+* **dashboard:** add lighthouse historic graphs ([206f3d8](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/206f3d8bcf7a20035c0944ba0a3853e9ef17a211))
+* remove grafana, prometheus and alloy integrations ([7275a6b](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/7275a6b3a3d70924f3374940e3aae3cf26eb613e))
+
+### Bug Fixes
+
+* lighthouse reports no longer leave empty directories ([71043f1](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/71043f1130328342e2a239187b95dc1f76d532e1))
+
 ## [1.0.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v0.2.0...v1.0.0) (2026-04-30)
 
 ### Features
