@@ -144,9 +144,12 @@ async function main(): Promise<void> {
   const runTask = (task: import("./scheduler.js").ScheduledTask): Promise<void> => {
     const site = store.get(task.site);
     if (!site) return Promise.resolve();
+    const key = `${task.type}:${task.site}`;
 
     if (task.type === "healthcheck") {
       return (async () => {
+        scheduler.setProgress(key, site.pages.length);
+
         // Snapshot previous state for all pages before running any check
         const prevStates = new Map<string, StoredHealthcheck | null>();
         if (sql) {
@@ -166,6 +169,7 @@ async function main(): Promise<void> {
               forceCloseTimeoutMs: config.healthcheck.forceCloseTimeoutMs,
             });
             await results?.recordHealthcheck(result);
+            scheduler.incrementProgress(key);
             pageResults.push({ page, result });
             if (config.runner.pageDelayMs > 0) await sleep(config.runner.pageDelayMs);
           }
@@ -181,6 +185,7 @@ async function main(): Promise<void> {
     }
 
     return (async () => {
+      scheduler.setProgress(key, site.pages.length);
       for (const page of site.pages) {
         const result = await runLighthouse(site, page, reportsDir, {
           desktopWidth: config.lighthouse.desktopWidth,
@@ -190,6 +195,7 @@ async function main(): Promise<void> {
         if (result) {
           await results?.recordLighthouse(result);
         }
+        scheduler.incrementProgress(key);
       }
     })();
   };

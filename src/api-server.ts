@@ -76,12 +76,27 @@ function json(res: ServerResponse, data: unknown, status = 200): void {
 
 async function handleStatus(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): Promise<void> {
   void req;
+  const progress = deps.scheduler.taskProgress;
+  const tasks = deps.scheduler.runningKeys.map((key) => {
+    const [type, ...siteParts] = key.split(":");
+    const site = siteParts.join(":");
+    const p = progress.get(key);
+    return {
+      key,
+      type: type as "healthcheck" | "lighthouse",
+      site,
+      pagesCompleted: p?.pagesCompleted ?? 0,
+      pagesTotal: p?.pagesTotal ?? 0,
+      startedAt: p?.startedAt ?? Date.now(),
+    };
+  });
   json(res, {
     version: process.env.HCW_VERSION ?? "dev",
     runningSince: new Date(deps.startedAt).toISOString(),
     uptimeSeconds: Math.floor((Date.now() - deps.startedAt) / 1000),
     workers: { active: deps.scheduler.inFlightCount, max: deps.maxWorkers },
     running: deps.scheduler.runningKeys,
+    tasks,
     paused: deps.scheduler.isPaused,
   });
 }

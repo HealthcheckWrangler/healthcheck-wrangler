@@ -8,6 +8,7 @@ export interface ScheduledTask {
 export class Scheduler {
   private _tasks: ScheduledTask[] = [];
   private _inFlight = new Map<string, Promise<void>>();
+  private _progress = new Map<string, { pagesCompleted: number; pagesTotal: number; startedAt: number }>();
   private stopping = false;
   private _paused = false;
 
@@ -62,6 +63,20 @@ export class Scheduler {
 
   markDone(key: string): void {
     this._inFlight.delete(key);
+    this._progress.delete(key);
+  }
+
+  setProgress(key: string, pagesTotal: number): void {
+    this._progress.set(key, { pagesCompleted: 0, pagesTotal, startedAt: Date.now() });
+  }
+
+  incrementProgress(key: string): void {
+    const p = this._progress.get(key);
+    if (p) p.pagesCompleted++;
+  }
+
+  get taskProgress(): Map<string, { pagesCompleted: number; pagesTotal: number; startedAt: number }> {
+    return this._progress;
   }
 
   isRunning(key: string): boolean {

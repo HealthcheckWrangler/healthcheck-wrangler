@@ -1,9 +1,19 @@
+export interface TaskStatus {
+  key: string;
+  type: "healthcheck" | "lighthouse";
+  site: string;
+  pagesCompleted: number;
+  pagesTotal: number;
+  startedAt: number;
+}
+
 export interface RunnerStatus {
   version: string;
   runningSince: string;
   uptimeSeconds: number;
   workers: { active: number; max: number };
   running: string[];
+  tasks: TaskStatus[];
   paused: boolean;
 }
 

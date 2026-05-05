@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Menu, Moon, Pause, Play, ScrollText, Sun, Wifi, WifiOff, X } from "lucide-react";
+import { ChevronUp, LayoutDashboard, Menu, Moon, Pause, Play, ScrollText, Sun, Wifi, WifiOff, X } from "lucide-react";
 import { cn } from "../lib/utils";
-import { api, type RunnerStatus, type Site } from "../api";
+import { api, type RunnerStatus, type TaskStatus, type Site } from "../api";
 import { TimeRangePicker } from "./TimeRangePicker";
 import { useTheme } from "../lib/theme";
 
@@ -16,6 +16,7 @@ export function Layout({ children, status, sites }: LayoutProps) {
   const location = useLocation();
   const isOnline = status !== null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isWorkerOpen, setIsWorkerOpen] = useState(false);
   const [pauseSubmitting, setPauseSubmitting] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
@@ -103,12 +104,21 @@ export function Layout({ children, status, sites }: LayoutProps) {
           )}
         </nav>
 
+        {/* Worker panel */}
+        {status && isWorkerOpen && <WorkerPanel status={status} />}
+
         {/* Footer */}
         {status && (
-          <div className="border-t border-[hsl(var(--border))] px-4 py-3 text-[11px] text-[hsl(var(--muted-foreground))]">
+          <button
+            onClick={() => setIsWorkerOpen((v) => !v)}
+            className="w-full border-t border-[hsl(var(--border))] px-4 py-3 text-left text-[11px] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] transition-colors"
+          >
             <div>v{status.version}</div>
-            <div>{status.workers.active}/{status.workers.max} workers</div>
-          </div>
+            <div className="flex items-center justify-between">
+              <span>{status.workers.active}/{status.workers.max} workers</span>
+              <ChevronUp className={cn("h-3 w-3 transition-transform duration-200", isWorkerOpen ? "" : "rotate-180")} />
+            </div>
+          </button>
         )}
       </aside>
 
@@ -177,6 +187,64 @@ function PausedTicker() {
         {item}
         {item}
       </div>
+    </div>
+  );
+}
+
+function WorkerPanel({ status }: { status: RunnerStatus }) {
+  const slots = Array.from({ length: status.workers.max }, (_, i) => status.tasks[i] ?? null);
+  return (
+    <div className="border-t border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+      {slots.map((task, i) => (
+        <div key={i} className="border-b border-[hsl(var(--border)/0.5)] px-4 py-2.5 last:border-b-0">
+          {task ? <RunningSlot task={task} /> : <IdleSlot />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RunningSlot({ task }: { task: TaskStatus }) {
+  const pct = task.pagesTotal > 0 ? (task.pagesCompleted / task.pagesTotal) * 100 : 0;
+  const elapsed = Math.round((Date.now() - task.startedAt) / 1000);
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span className={cn(
+          "rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide shrink-0",
+          task.type === "healthcheck"
+            ? "bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]"
+            : "bg-[hsl(var(--warning)/0.15)] text-[hsl(var(--warning))]",
+        )}>
+          {task.type === "healthcheck" ? "HC" : "LH"}
+        </span>
+        <span className="truncate text-[11px] font-medium text-[hsl(var(--foreground))]" title={task.site}>
+          {task.site}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-1.5 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
+          <div
+            className="h-full rounded-full bg-[hsl(var(--primary))] transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span
+          className="shrink-0 text-[10px] text-[hsl(var(--muted-foreground))]"
+          title={`${elapsed}s elapsed`}
+        >
+          {task.pagesCompleted}/{task.pagesTotal}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function IdleSlot() {
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">
+      <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--border))]" />
+      Idle
     </div>
   );
 }
