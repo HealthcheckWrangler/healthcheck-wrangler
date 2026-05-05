@@ -12,6 +12,7 @@ interface KpiTrendProps {
 
 export function KpiTrend({ label, value, ok, trendData, trendColor = "hsl(217 91% 60%)", className }: KpiTrendProps) {
   const hasData = trendData.length > 1;
+  const gradId = `kpiGrad-${label.replace(/[^a-zA-Z0-9]/g, "_")}`;
 
   return (
     <div className={cn(
@@ -25,7 +26,7 @@ export function KpiTrend({ label, value, ok, trendData, trendColor = "hsl(217 91
           <ResponsiveContainer width="100%" height={48}>
             <AreaChart data={trendData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
               <defs>
-                <linearGradient id={`kpiGrad-${label}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={trendColor} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={trendColor} stopOpacity={0} />
                 </linearGradient>
@@ -49,7 +50,8 @@ export function KpiTrend({ label, value, ok, trendData, trendColor = "hsl(217 91
                 dataKey="value"
                 stroke={trendColor}
                 strokeWidth={1.5}
-                fill={`url(#kpiGrad-${label})`}
+                fill={`url(#${gradId})`}
+                fillOpacity={1}
                 dot={false}
                 isAnimationActive={false}
               />
