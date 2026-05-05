@@ -1,11 +1,11 @@
 # Site name — kebab-case, must match the filename (dr-garcia.yaml → name: dr-garcia).
-# Used in metric labels, log output, and Grafana dashboards.
+# Used in log output and the dashboard.
 name: example-site
 
 # Root URL of the site. All page paths below are resolved relative to this.
 baseUrl: https://example.com
 
-# Whether to fire PagerDuty / Grafana alerts for this site.
+# Whether to fire channel alerts for this site.
 # Set to false to monitor silently while a site is being onboarded.
 alerting: true
 
@@ -33,7 +33,7 @@ lighthouse:
 # Pages to monitor. Each page gets its own healthcheck and Lighthouse audit.
 pages:
   - path: /
-    # Human-readable label used in logs, metrics, and Grafana dashboards.
+    # Human-readable label used in logs and the dashboard.
     name: Home
     # CSS selectors that must be visible for the page to be considered healthy.
     # Use browser DevTools to find stable selectors — prefer semantic elements or

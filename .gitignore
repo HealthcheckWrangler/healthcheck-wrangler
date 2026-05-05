@@ -11,4 +11,3 @@ config.yaml
 .npmrc
 playwright-report/
 test-results/
-grafana/provisioning/alerting/contact-points.yaml

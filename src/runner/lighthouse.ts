@@ -99,7 +99,7 @@ export async function runLighthouse(
     const categories = lhr.categories;
 
     // Returns -1 when Lighthouse couldn't compute the score (e.g. NO_LCP → no performance score).
-    // This lets Grafana distinguish "genuinely bad" (0–49) from "not measurable" (-1).
+    // This lets the dashboard distinguish "genuinely bad" (0–49) from "not measurable" (-1).
     const score = (key: string): number => {
       const s = categories[key]?.score;
       return s == null ? -1 : Math.round((s as number) * 100);

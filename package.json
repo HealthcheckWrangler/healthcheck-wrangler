@@ -1,15 +1,17 @@
 {
   "name": "@healthcheckwrangler/hcw",
   "version": "2.0.0",
-  "description": "Playwright + Lighthouse site monitoring with Prometheus metrics.",
+  "description": "Playwright + Lighthouse site monitoring with TimescaleDB.",
   "type": "module",
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HealthcheckWrangler/healthcheck-wrangler"
+  },
   "bin": {
-    "hcw": "./dist/src/cli/index.js",
-    "hcw-alerting-push": "./dist/scripts/sync-alerting.js",
-    "hcw-dashboards-push": "./dist/scripts/sync-dashboards.js"
+    "hcw": "./dist/src/cli/index.js"
   },
   "files": [
     "dist/",
@@ -25,9 +27,7 @@
     "dev": "tsx watch src/index.ts",
     "dev:ui": "vite --config src/dashboard/ui/vite.config.ts",
     "hcw": "tsx src/cli/index.ts",
-    "dashboards:push": "tsx --env-file=.env scripts/sync-dashboards.ts",
-    "alerting:push": "tsx --env-file=.env scripts/sync-alerting.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+"typecheck": "tsc -p tsconfig.json --noEmit",
     "release": "release-it",
     "commit": "cz",
     "prepare": "husky"
