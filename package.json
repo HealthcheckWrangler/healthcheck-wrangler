@@ -1,6 +1,6 @@
 {
   "name": "@healthcheckwrangler/hcw",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Playwright + Lighthouse site monitoring with TimescaleDB.",
   "type": "module",
   "engines": {
@@ -27,7 +27,7 @@
     "dev": "tsx watch src/index.ts",
     "dev:ui": "vite --config src/dashboard/ui/vite.config.ts",
     "hcw": "tsx src/cli/index.ts",
-"typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "release": "release-it",
     "commit": "cz",
     "prepare": "husky"

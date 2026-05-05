@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v2.0.0...v2.1.0) (2026-05-05)
+
+### Features
+
+* **dashboard:** add dark/light theme support ([ff666ff](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/ff666fff58a80ab6fe196687ff7d7da10457424c))
+* **dashboard:** add logo, theme toggle, pause controls, and paused banner ([d9de152](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/d9de15219cbdeff946bdbe2f7b60fe30da31d924))
+* **runner:** add manual trigger and pause/resume monitoring ([645c8e2](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/645c8e2c808cc523e8269e55617e6f586578ecbf))
+
+### Bug Fixes
+
+* **dashboard:** fix kpi trend sparkline gradient rendering ([78d79fc](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/78d79fcc69ca13521e09714cab68c0d968434e08)), closes [#kpiGrad-Pages](https://github.com/HealthcheckWrangler/healthcheck-wrangler/issues/kpiGrad-Pages)
+
 ## [2.0.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v1.0.0...v2.0.0) (2026-05-01)
 
 ### Features
