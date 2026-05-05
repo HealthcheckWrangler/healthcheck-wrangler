@@ -27,3 +27,9 @@ export function fmtCountdown(targetMs: number): string {
   if (diff <= 0) return "now";
   return `in ${fmtDuration(diff)}`;
 }
+
+export function fmtOverdue(targetMs: number): { overdue: boolean; label: string } {
+  const diff = Date.now() - targetMs;
+  if (diff <= 0) return { overdue: false, label: `next ${fmtDuration(-diff)}` };
+  return { overdue: true, label: `${fmtDuration(diff)} past due` };
+}
