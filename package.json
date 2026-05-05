@@ -1,6 +1,6 @@
 {
   "name": "@healthcheckwrangler/hcw",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Playwright + Lighthouse site monitoring with TimescaleDB.",
   "type": "module",
   "engines": {

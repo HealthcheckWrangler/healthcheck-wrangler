@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v2.1.0...v2.2.0) (2026-05-05)
+
+### Features
+
+* add detailed worker progress tracker ([fbe5488](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/fbe548899b4405140565af767ae430c7442dd368))
+
 ## [2.1.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v2.0.0...v2.1.0) (2026-05-05)
 
 ### Features
