@@ -9,6 +9,7 @@ export class Scheduler {
   private _tasks: ScheduledTask[] = [];
   private _inFlight = new Map<string, Promise<void>>();
   private stopping = false;
+  private _paused = false;
 
   rebuild(sites: import("./config.js").Site[], lighthouseStartDelayMs: number): void {
     const now = Date.now();
@@ -48,6 +49,13 @@ export class Scheduler {
     task.nextRun = Date.now() + task.intervalMs;
   }
 
+  triggerNow(type: "healthcheck" | "lighthouse", site: string): boolean {
+    const task = this._tasks.find((t) => t.type === type && t.site === site);
+    if (!task) return false;
+    task.nextRun = Date.now();
+    return true;
+  }
+
   markRunning(key: string, promise: Promise<void>): void {
     this._inFlight.set(key, promise);
   }
@@ -70,9 +78,11 @@ export class Scheduler {
     this.stopping = true;
   }
 
-  get isStopping(): boolean {
-    return this.stopping;
-  }
+  pause(): void { this._paused = true; }
+  resume(): void { this._paused = false; }
+
+  get isStopping(): boolean { return this.stopping; }
+  get isPaused(): boolean { return this._paused; }
 
   get taskList(): ScheduledTask[] {
     return this._tasks;

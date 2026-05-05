@@ -210,37 +210,40 @@ async function main(): Promise<void> {
 
   while (!scheduler.isStopping) {
     const now = Date.now();
-    const due = scheduler.due(now);
 
     let dispatched = 0;
-    for (const task of due) {
-      const key = `${task.type}:${task.site}`;
-      if (scheduler.isRunning(key)) continue;
-      if (task.type === "lighthouse" && scheduler.hasLighthouseRunning()) continue;
-      if (scheduler.inFlightCount >= config.runner.workers) break;
+    if (!scheduler.isPaused) {
+      const due = scheduler.due(now);
 
-      logger.info({ site: task.site, type: task.type, workers: scheduler.inFlightCount + 1 }, "task started");
-      const promise = runTask(task)
-        .catch((err) => logger.error({ err, site: task.site, type: task.type }, "task failed"))
-        .finally(() => {
-          scheduler.markDone(key);
-          scheduler.markRan(task);
-          logger.info({ site: task.site, type: task.type }, "task complete");
-        });
-      scheduler.markRunning(key, promise);
-      dispatched++;
-      idleLoggedAt = 0;
-    }
+      for (const task of due) {
+        const key = `${task.type}:${task.site}`;
+        if (scheduler.isRunning(key)) continue;
+        if (task.type === "lighthouse" && scheduler.hasLighthouseRunning()) continue;
+        if (scheduler.inFlightCount >= config.runner.workers) break;
 
-    if (dispatched === 0 && due.length === 0 && now - idleLoggedAt > 60_000) {
-      const next = scheduler.nextDue();
-      if (next) {
-        const inSec = Math.round(Math.max(0, next.at - now) / 1000);
-        logger.info(
-          { nextSite: next.task.site, nextType: next.task.type, inSeconds: inSec },
-          "idle — next task scheduled",
-        );
-        idleLoggedAt = now;
+        logger.info({ site: task.site, type: task.type, workers: scheduler.inFlightCount + 1 }, "task started");
+        const promise = runTask(task)
+          .catch((err) => logger.error({ err, site: task.site, type: task.type }, "task failed"))
+          .finally(() => {
+            scheduler.markDone(key);
+            scheduler.markRan(task);
+            logger.info({ site: task.site, type: task.type }, "task complete");
+          });
+        scheduler.markRunning(key, promise);
+        dispatched++;
+        idleLoggedAt = 0;
+      }
+
+      if (dispatched === 0 && due.length === 0 && now - idleLoggedAt > 60_000) {
+        const next = scheduler.nextDue();
+        if (next) {
+          const inSec = Math.round(Math.max(0, next.at - now) / 1000);
+          logger.info(
+            { nextSite: next.task.site, nextType: next.task.type, inSeconds: inSec },
+            "idle — next task scheduled",
+          );
+          idleLoggedAt = now;
+        }
       }
     }
 

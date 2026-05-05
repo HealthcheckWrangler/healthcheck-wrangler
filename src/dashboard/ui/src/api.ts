@@ -4,6 +4,7 @@ export interface RunnerStatus {
   uptimeSeconds: number;
   workers: { active: number; max: number };
   running: string[];
+  paused: boolean;
 }
 
 export interface SitePage {
@@ -166,6 +167,11 @@ export const api = {
     get<KpiTrendPoint[]>(`/api/sites/${encodeURIComponent(name)}/kpi-trend?startMs=${startMs}&endMs=${endMs}`),
   siteLighthouseHistory: (name: string, startMs: number, endMs: number) =>
     get<LighthouseHistoryPoint[]>(`/api/sites/${encodeURIComponent(name)}/lighthouse-history?startMs=${startMs}&endMs=${endMs}`),
+  trigger: (site: string, type: "healthcheck" | "lighthouse") =>
+    fetch(`/api/sites/${encodeURIComponent(site)}/trigger/${type}`, { method: "POST" })
+      .then((r) => r.json() as Promise<{ triggered: boolean } | { error: string }>),
+  pause: () => fetch("/api/runner/pause", { method: "POST" }).then((r) => r.json()),
+  resume: () => fetch("/api/runner/resume", { method: "POST" }).then((r) => r.json()),
   logs: async (query: LogQuery = {}): Promise<LogEntry[]> => {
     const params = new URLSearchParams();
     if (query.startMs !== undefined) params.set("startMs", String(query.startMs));

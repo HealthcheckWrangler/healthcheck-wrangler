@@ -82,6 +82,7 @@ async function handleStatus(req: IncomingMessage, res: ServerResponse, deps: Api
     uptimeSeconds: Math.floor((Date.now() - deps.startedAt) / 1000),
     workers: { active: deps.scheduler.inFlightCount, max: deps.maxWorkers },
     running: deps.scheduler.runningKeys,
+    paused: deps.scheduler.isPaused,
   });
 }
 
@@ -207,13 +208,39 @@ function handleSystem(_req: IncomingMessage, res: ServerResponse): void {
 
 async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): Promise<void> {
   if (req.method === "OPTIONS") {
-    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET" });
+    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST" });
     res.end();
     return;
   }
 
   const url = new URL(req.url!, `http://localhost`);
   const path = url.pathname;
+
+  if (req.method === "POST") {
+    if (path === "/api/runner/pause") {
+      deps.scheduler.pause();
+      json(res, { paused: true }); return;
+    }
+    if (path === "/api/runner/resume") {
+      deps.scheduler.resume();
+      json(res, { paused: false }); return;
+    }
+    const triggerMatch = path.match(/^\/api\/sites\/([^/]+)\/trigger\/(healthcheck|lighthouse)$/);
+    if (triggerMatch) {
+      const site = decodeURIComponent(triggerMatch[1]!);
+      const type = triggerMatch[2] as "healthcheck" | "lighthouse";
+      const key = `${type}:${site}`;
+      if (deps.scheduler.isRunning(key)) {
+        json(res, { error: "already running" }, 409); return;
+      }
+      const triggered = deps.scheduler.triggerNow(type, site);
+      if (!triggered) {
+        json(res, { error: "task not found — check may be disabled" }, 404); return;
+      }
+      json(res, { triggered: true }); return;
+    }
+    json(res, { error: "not found" }, 404); return;
+  }
 
   if (path === "/api/system")     { handleSystem(req, res); return; }
   if (path === "/api/status")     return handleStatus(req, res, deps);
