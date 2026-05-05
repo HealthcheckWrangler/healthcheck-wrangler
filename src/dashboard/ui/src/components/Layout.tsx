@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Activity, LayoutDashboard, Menu, ScrollText, Wifi, WifiOff, X } from "lucide-react";
+import { LayoutDashboard, Menu, Moon, Pause, Play, ScrollText, Sun, Wifi, WifiOff, X } from "lucide-react";
 import { cn } from "../lib/utils";
-import type { RunnerStatus, Site } from "../api";
+import { api, type RunnerStatus, type Site } from "../api";
 import { TimeRangePicker } from "./TimeRangePicker";
+import { useTheme } from "../lib/theme";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,8 +16,21 @@ export function Layout({ children, status, sites }: LayoutProps) {
   const location = useLocation();
   const isOnline = status !== null;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [pauseSubmitting, setPauseSubmitting] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => { setIsSidebarOpen(false); }, [location.pathname]);
+
+  const isPaused = status?.paused ?? false;
+
+  const handlePauseToggle = async () => {
+    const msg = isPaused
+      ? "Resume monitoring? Overdue checks will run immediately."
+      : "Pause monitoring? In-progress checks will finish, but no new checks will start until you resume.";
+    if (!window.confirm(msg)) return;
+    setPauseSubmitting(true);
+    try { await (isPaused ? api.resume() : api.pause()); } finally { setPauseSubmitting(false); }
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-[hsl(var(--background))]">
@@ -37,7 +51,7 @@ export function Layout({ children, status, sites }: LayoutProps) {
       )}>
         {/* Logo */}
         <div className="flex items-center gap-2 border-b border-[hsl(var(--border))] px-4 py-4">
-          <Activity className="h-5 w-5 text-[hsl(var(--primary))]" />
+          <img src="/favicon.png" alt="" className="h-6 w-6 object-contain" />
           <span className="text-sm font-semibold text-[hsl(var(--foreground))]">HCW</span>
           {isOnline ? (
             <Wifi className="ml-auto h-3.5 w-3.5 text-[hsl(var(--success))]" />
@@ -109,11 +123,59 @@ export function Layout({ children, status, sites }: LayoutProps) {
           >
             {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <TimeRangePicker />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => void handlePauseToggle()}
+              disabled={!status || pauseSubmitting}
+              title={isPaused ? "Resume monitoring" : "Pause monitoring"}
+              className={cn(
+                "rounded p-1.5 transition-colors disabled:opacity-40",
+                isPaused
+                  ? "text-[hsl(var(--warning))] hover:bg-[hsl(var(--accent))]"
+                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
+              )}
+            >
+              {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="rounded p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <TimeRangePicker />
+          </div>
         </div>
+        {isPaused && <PausedTicker />}
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
+      </div>
+    </div>
+  );
+}
+
+const TICKER_TEXT = "⏸  MONITORING PAUSED — No new checks will start until you resume  ·  ";
+
+function PausedTicker() {
+  const item = (
+    <span className="shrink-0">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <span key={i} className="inline-block px-2 text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: "hsl(25 30% 12%)" }}>
+          {TICKER_TEXT}
+        </span>
+      ))}
+    </span>
+  );
+  return (
+    <div
+      className="shrink-0 overflow-hidden border-b border-[hsl(38_60%_40%)]"
+      style={{ background: "hsl(var(--warning))" }}
+    >
+      <div style={{ display: "inline-flex", animation: "ticker 12s linear infinite", willChange: "transform" }}>
+        {item}
+        {item}
       </div>
     </div>
   );
