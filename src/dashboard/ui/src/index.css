@@ -2,23 +2,48 @@
 
 @layer base {
   :root {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 96%;
-    --card: 222 47% 14%;
-    --card-foreground: 210 40% 96%;
-    --border: 217 33% 22%;
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 60%;
+    /* Dark mode — default (near black) */
+    --background: 0 0% 6%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 93%;
+    --border: 0 0% 15%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 55%;
     --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
-    --accent: 217 33% 22%;
-    --accent-foreground: 210 40% 96%;
+    --primary-foreground: 0 0% 6%;
+    --accent: 0 0% 13%;
+    --accent-foreground: 0 0% 93%;
     --destructive: 0 63% 55%;
-    --destructive-foreground: 210 40% 96%;
+    --destructive-foreground: 0 0% 93%;
     --success: 142 71% 45%;
     --warning: 38 92% 50%;
     --radius: 0.5rem;
   }
+
+  :root.light {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --border: 0 0% 88%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 45%;
+    --primary: 217 91% 48%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 0 0% 93%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 38%;
+    --warning: 38 92% 44%;
+    --radius: 0.5rem;
+  }
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 
 @layer base {

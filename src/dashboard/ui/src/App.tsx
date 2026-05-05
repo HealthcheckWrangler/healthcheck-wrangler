@@ -6,6 +6,7 @@ import { SiteDashboard } from "./pages/SiteDashboard";
 import { Logs } from "./pages/Logs";
 import { api, type RunnerStatus, type Site } from "./api";
 import { TimeRangeProvider } from "./lib/time-range";
+import { ThemeProvider } from "./lib/theme";
 
 export function App() {
   const [status, setStatus] = useState<RunnerStatus | null>(null);
@@ -23,15 +24,17 @@ export function App() {
 
   return (
     <BrowserRouter>
-      <TimeRangeProvider>
-      <Layout status={status} sites={sites}>
-        <Routes>
-          <Route path="/" element={<Overview />} />
-          <Route path="/sites/:name" element={<SiteDashboard />} />
-          <Route path="/logs" element={<Logs />} />
-        </Routes>
-      </Layout>
-      </TimeRangeProvider>
+      <ThemeProvider>
+        <TimeRangeProvider>
+          <Layout status={status} sites={sites}>
+            <Routes>
+              <Route path="/" element={<Overview />} />
+              <Route path="/sites/:name" element={<SiteDashboard />} />
+              <Route path="/logs" element={<Logs />} />
+            </Routes>
+          </Layout>
+        </TimeRangeProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
