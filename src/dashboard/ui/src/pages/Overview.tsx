@@ -106,7 +106,10 @@ export function Overview() {
             <Link
               key={site.name}
               to={`/sites/${site.name}`}
-              className="group block rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] overflow-hidden transition-all hover:border-[hsl(var(--primary)/0.5)] hover:shadow-lg hover:shadow-[hsl(var(--primary)/0.05)]"
+              className={cn(
+                "group block rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] overflow-hidden transition-all hover:border-[hsl(var(--primary)/0.5)] hover:shadow-lg hover:shadow-[hsl(var(--primary)/0.05)]",
+                !site.enabled && "opacity-60",
+              )}
             >
               {/* Header */}
               <div className="flex items-start justify-between gap-2 p-4 pb-3">
@@ -125,10 +128,18 @@ export function Overview() {
                     <ExternalLink className="h-3 w-3 flex-shrink-0" />
                   </a>
                 </div>
-                <StatusBadge status={siteStatus} />
+                {site.enabled
+                  ? <StatusBadge status={siteStatus} />
+                  : <span className="shrink-0 rounded-full bg-[hsl(var(--muted))] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--muted-foreground))]">Disabled</span>
+                }
               </div>
 
               {/* Pages-down counter */}
+              {!site.enabled ? (
+                <div className="mx-4 mb-3 rounded-lg bg-[hsl(var(--muted))] flex items-center justify-center py-6">
+                  <span className="text-xs text-[hsl(var(--muted-foreground))]">monitoring disabled</span>
+                </div>
+              ) : (
               <div
                 className={cn(
                   "mx-4 mb-3 rounded-lg flex flex-col items-center justify-center py-4",
@@ -159,6 +170,7 @@ export function Overview() {
                       : `page${pagesDown !== 1 ? "s" : ""} down`}
                 </span>
               </div>
+              )}
 
               {/* Aggregate stats */}
               <div className="grid grid-cols-3 gap-2 px-4 pb-3 text-xs">
