@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v2.2.0...v3.0.0) (2026-05-12)
+
+### ⚠ BREAKING CHANGES
+
+* named alerting channels with per-site add/remove overrides
+
+### Features
+
+* annotations — timestamped chart markers with create/edit/delete ([7f2ea7f](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/7f2ea7f32ad13635503d948278507712b6573480))
+* disabled visual state for sites in overview ([e862424](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/e8624248b6c86d5f0b6d560eb8f700dd85883b80))
+* named alerting channels with per-site add/remove overrides ([6a30177](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/6a30177f814251982b61067ce258eea9d1bfa405))
+* uptime % KPIs (24h/7d/30d) on site overview ([9822d85](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/9822d85ff358d4111443bad796f802578edf6748))
+* worker monitoring dashboard with utilization history and capacity forecast ([170d173](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/170d1734ec7508d7849b2dad9824dbfb5aa0960d))
+
+### Bug Fixes
+
+* show latest lighthouse result per page on Pages tab ([c5c27aa](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/c5c27aa0e3a0662244835314df2de0b692d2a3a7))
+
 ## [2.2.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v2.1.0...v2.2.0) (2026-05-05)
 
 ### Features
