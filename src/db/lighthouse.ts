@@ -101,6 +101,19 @@ export async function getLighthouseHistory(
   `;
 }
 
+export async function getAllLatestLighthouse(
+  sql: postgres.Sql,
+  site: string,
+): Promise<StoredLighthouse[]> {
+  return sql<StoredLighthouse[]>`
+    SELECT ts, site, page, perf, a11y, best_practices, seo,
+           lcp, fcp, tbt, cls, ttfb, speed_index, report_url
+    FROM lighthouse_latest
+    WHERE site = ${site}
+    ORDER BY ts DESC
+  `;
+}
+
 export async function getLighthouseHistoryForRange(
   sql: postgres.Sql,
   site: string,

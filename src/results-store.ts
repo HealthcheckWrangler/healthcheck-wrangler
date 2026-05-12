@@ -11,6 +11,7 @@ import {
 import {
   insertLighthouse,
   getLighthouseHistory,
+  getAllLatestLighthouse,
   type StoredLighthouse,
 } from "./db/lighthouse.js";
 
@@ -50,5 +51,9 @@ export class ResultsStore {
 
   async getLighthouseHistory(site: string): Promise<StoredLighthouse[]> {
     return getLighthouseHistory(this.sql, site);
+  }
+
+  async getAllLatestLighthouse(site: string): Promise<StoredLighthouse[]> {
+    return getAllLatestLighthouse(this.sql, site);
   }
 }
