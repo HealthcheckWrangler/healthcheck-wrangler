@@ -1,5 +1,6 @@
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
+import { AreaChart, Area, XAxis, ReferenceLine, ResponsiveContainer, Tooltip } from "recharts";
 import { cn } from "../lib/utils";
+import type { Annotation } from "../api";
 
 interface KpiTrendProps {
   label: string;
@@ -8,10 +9,14 @@ interface KpiTrendProps {
   trendData: { bucket: number; value: number }[];
   trendColor?: string;
   className?: string;
+  annotations?: Annotation[];
 }
 
-export function KpiTrend({ label, value, ok, trendData, trendColor = "hsl(217 91% 60%)", className }: KpiTrendProps) {
+export function KpiTrend({ label, value, ok, trendData, trendColor = "hsl(217 91% 60%)", className, annotations = [] }: KpiTrendProps) {
   const hasData = trendData.length > 1;
+  const dataStart = trendData[0]?.bucket ?? 0;
+  const dataEnd   = trendData[trendData.length - 1]?.bucket ?? 0;
+  const visibleAnnotations = annotations.filter((a) => a.ts >= dataStart && a.ts <= dataEnd);
   const gradId = `kpiGrad-${label.replace(/[^a-zA-Z0-9]/g, "_")}`;
 
   return (
@@ -45,6 +50,7 @@ export function KpiTrend({ label, value, ok, trendData, trendColor = "hsl(217 91
                   );
                 }}
               />
+              <XAxis dataKey="bucket" type="number" domain={["dataMin", "dataMax"]} hide />
               <Area
                 type="monotone"
                 dataKey="value"
@@ -55,6 +61,9 @@ export function KpiTrend({ label, value, ok, trendData, trendColor = "hsl(217 91
                 dot={false}
                 isAnimationActive={false}
               />
+              {visibleAnnotations.map((a) => (
+                <ReferenceLine key={a.id} x={a.ts} stroke={a.color} strokeWidth={1.5} strokeDasharray="3 2" />
+              ))}
             </AreaChart>
           </ResponsiveContainer>
         ) : (

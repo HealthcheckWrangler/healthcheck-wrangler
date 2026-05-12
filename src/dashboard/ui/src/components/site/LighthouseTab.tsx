@@ -4,7 +4,7 @@ import {
   Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { cn } from "../../lib/utils";
-import type { LighthouseHistoryPoint } from "../../api";
+import type { LighthouseHistoryPoint, Annotation } from "../../api";
 
 const SCORE_COLORS = {
   perf: "hsl(217 91% 60%)",
@@ -69,7 +69,7 @@ function buildAveragedPoints(history: LighthouseHistoryPoint[]): ChartPoint[] {
     }));
 }
 
-function ScoresChart({ points }: { points: ChartPoint[] }) {
+function ScoresChart({ points, annotations }: { points: ChartPoint[]; annotations: Annotation[] }) {
   const showDots = points.length <= 20;
   return (
     <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
@@ -89,13 +89,18 @@ function ScoresChart({ points }: { points: ChartPoint[] }) {
           {(Object.keys(SCORE_COLORS) as (keyof typeof SCORE_COLORS)[]).map((key) => (
             <Line key={key} type="monotone" dataKey={key} name={SCORE_NAMES[key]} stroke={SCORE_COLORS[key]} strokeWidth={2} dot={showDots} activeDot={{ r: 4 }} connectNulls animationDuration={400} />
           ))}
+          {annotations.map((a) => (
+            <ReferenceLine key={a.id} x={a.ts} stroke={a.color} strokeWidth={1.5} strokeDasharray="4 2"
+              label={{ value: a.label.length > 18 ? a.label.slice(0, 17) + "…" : a.label, position: "insideTopLeft", fontSize: 9, fill: a.color, angle: -90, offset: 4 }}
+            />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-function VitalsChart({ points }: { points: ChartPoint[] }) {
+function VitalsChart({ points, annotations }: { points: ChartPoint[]; annotations: Annotation[] }) {
   const showDots = points.length <= 20;
   return (
     <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
@@ -129,6 +134,11 @@ function VitalsChart({ points }: { points: ChartPoint[] }) {
             <Line key={key} yAxisId="left" type="monotone" dataKey={key} name={VITAL_NAMES[key]} stroke={VITAL_COLORS[key]} strokeWidth={2} dot={showDots} activeDot={{ r: 4 }} connectNulls animationDuration={400} />
           ))}
           <Line yAxisId="right" type="monotone" dataKey="cls" name="CLS" stroke={CLS_COLOR} strokeWidth={2} dot={showDots} activeDot={{ r: 4 }} connectNulls strokeDasharray="6 3" animationDuration={400} />
+          {annotations.map((a) => (
+            <ReferenceLine key={a.id} yAxisId="left" x={a.ts} stroke={a.color} strokeWidth={1.5} strokeDasharray="4 2"
+              label={{ value: a.label.length > 18 ? a.label.slice(0, 17) + "…" : a.label, position: "insideTopLeft", fontSize: 9, fill: a.color, angle: -90, offset: 4 }}
+            />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -139,9 +149,10 @@ interface LighthouseTabProps {
   history: LighthouseHistoryPoint[];
   selectedPage: string;
   onSelectPage: (p: string) => void;
+  annotations: Annotation[];
 }
 
-export function LighthouseTab({ history, selectedPage, onSelectPage }: LighthouseTabProps) {
+export function LighthouseTab({ history, selectedPage, onSelectPage, annotations }: LighthouseTabProps) {
   const pages = useMemo(() => [...new Set(history.map((h) => h.page))].sort(), [history]);
   const averagedPoints = useMemo(() => buildAveragedPoints(history), [history]);
   const pagePoints = useMemo((): ChartPoint[] =>
@@ -210,8 +221,8 @@ export function LighthouseTab({ history, selectedPage, onSelectPage }: Lighthous
               ? `Averaged across ${pages.length} page${pages.length !== 1 ? "s" : ""} · ${activePoints.length} audit rounds`
               : `${activePoints.length} audits`}
           </div>
-          <ScoresChart points={activePoints} />
-          <VitalsChart points={activePoints} />
+          <ScoresChart points={activePoints} annotations={annotations} />
+          <VitalsChart points={activePoints} annotations={annotations} />
         </>
       )}
     </div>

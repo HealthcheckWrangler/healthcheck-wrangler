@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, type SiteDetail, type ScheduleTask, type TimelineSeries, type KpiTrendPoint, type LighthouseResult, type LighthouseHistoryPoint } from "../api";
+import { api, type SiteDetail, type ScheduleTask, type TimelineSeries, type KpiTrendPoint, type LighthouseResult, type LighthouseHistoryPoint, type UptimeStats, type Annotation } from "../api";
 import { LogViewer } from "../components/LogViewer";
 import { StateTimeline } from "../components/StateTimeline";
 import { SiteHeader, type Tab } from "../components/site/SiteHeader";
@@ -20,12 +20,35 @@ export function SiteDashboard() {
   const [lhHistory, setLhHistory] = useState<LighthouseHistoryPoint[]>([]);
   const [selectedLhPage, setSelectedLhPage] = useState<string>("__all__");
   const [triggering, setTriggering] = useState<"healthcheck" | "lighthouse" | null>(null);
+  const [uptime, setUptime] = useState<UptimeStats | null>(null);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const { range } = useTimeRange();
 
   const runNow = async (type: "healthcheck" | "lighthouse") => {
     if (!name || triggering) return;
     setTriggering(type);
     try { await api.trigger(name, type); } finally { setTriggering(null); }
+  };
+
+  const refreshAnnotations = () => {
+    if (!name) return;
+    api.annotations(name).then(setAnnotations).catch(() => {});
+  };
+
+  const addAnnotation = async (label: string, ts: number) => {
+    if (!name) return;
+    await api.createAnnotation({ label, site: name, ts });
+    refreshAnnotations();
+  };
+
+  const updateAnnotation = async (id: number, label: string, ts: number) => {
+    await api.updateAnnotation(id, { label, ts });
+    refreshAnnotations();
+  };
+
+  const deleteAnnotation = async (id: number) => {
+    await api.deleteAnnotation(id);
+    setAnnotations((prev) => prev.filter((a) => a.id !== id));
   };
 
   useEffect(() => {
@@ -40,6 +63,12 @@ export function SiteDashboard() {
     load();
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
+  }, [name]);
+
+  useEffect(() => {
+    if (!name) return;
+    api.siteUptime(name).then(setUptime).catch(() => {});
+    api.annotations(name).then(setAnnotations).catch(() => {});
   }, [name]);
 
   useEffect(() => {
@@ -82,7 +111,6 @@ export function SiteDashboard() {
     : null;
 
   const siteStatus = hcTask?.running ? "running" : pagesWithData.length === 0 ? "unknown" : pagesDown > 0 ? "down" : "up";
-  const latestLh = site.results.lighthouse.at(-1);
 
   const latestLhPerPage = new Map<string, LighthouseResult>();
   for (const lh of site.results.lighthouse) {
@@ -98,6 +126,10 @@ export function SiteDashboard() {
         lhTask={lhTask}
         triggering={triggering}
         onRunNow={runNow}
+        annotations={annotations}
+        onAddAnnotation={addAnnotation}
+        onUpdateAnnotation={updateAnnotation}
+        onDeleteAnnotation={deleteAnnotation}
         tab={tab}
         onTabChange={setTab}
       />
@@ -111,7 +143,9 @@ export function SiteDashboard() {
             pagesWithData={pagesWithData.length}
             avgDuration={avgDuration}
             kpiTrend={kpiTrend}
-            latestLh={latestLh}
+            latestLhPerPage={latestLhPerPage}
+            uptime={uptime}
+            annotations={annotations}
           />
         )}
 
@@ -122,6 +156,7 @@ export function SiteDashboard() {
               startMs={range.startMs}
               endMs={range.endMs}
               title={`Page availability (${range.label})`}
+              annotations={annotations}
             />
           </div>
         )}
@@ -131,6 +166,7 @@ export function SiteDashboard() {
             history={lhHistory}
             selectedPage={selectedLhPage}
             onSelectPage={setSelectedLhPage}
+            annotations={annotations}
           />
         )}
 

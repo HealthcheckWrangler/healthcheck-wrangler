@@ -71,7 +71,8 @@ export interface LighthouseResult {
 export interface Site {
   name: string;
   baseUrl: string;
-  alerting: boolean;
+  enabled: boolean;
+  alerting: boolean | { add: string[]; remove: string[] };
   healthcheck: { enabled: boolean; intervalMinutes: number; timeoutSeconds: number };
   lighthouse: { enabled: boolean; intervalMinutes: number; throttling: string };
   pages: SitePage[];
@@ -93,6 +94,7 @@ export interface ScheduleTask {
   nextRun: number;
   nextRunInSeconds: number;
   running: boolean;
+  triggeredAt: number | null;
 }
 
 export interface LogEntry {
@@ -149,6 +151,48 @@ export interface LighthouseHistoryPoint {
   tbt: number;
 }
 
+export interface Annotation {
+  id: number;
+  ts: number;
+  label: string;
+  site: string | null;
+  color: string;
+}
+
+export interface WorkerStatPoint {
+  ts: number;
+  utilPct: number;
+  queueDepth: number;
+  activeLh: number;
+  activeHc: number;
+  maxWorkers: number;
+}
+
+export interface WorkerScenario {
+  workers: number;
+  satPct: number;
+  avgWaitMs: number;
+  estimatedRamMb: number;
+  tasksPerHourCapacity: number;
+  projectedMemPct: number;
+}
+
+export interface WorkerForecast {
+  scenarios: WorkerScenario[];
+  recommendations: string[];
+  sampleCount: number;
+  avgDurationMs: number;
+  currentQueueDepth: number;
+  tasksPerHour: number;
+  maxWorkers: number;
+}
+
+export interface UptimeStats {
+  h24: number | null;
+  d7:  number | null;
+  d30: number | null;
+}
+
 export interface SystemStats {
   memory: { totalBytes: number; usedBytes: number };
   cpu: { count: number; load1m: number; load5m: number; load15m: number };
@@ -177,6 +221,31 @@ export const api = {
     get<KpiTrendPoint[]>(`/api/sites/${encodeURIComponent(name)}/kpi-trend?startMs=${startMs}&endMs=${endMs}`),
   siteLighthouseHistory: (name: string, startMs: number, endMs: number) =>
     get<LighthouseHistoryPoint[]>(`/api/sites/${encodeURIComponent(name)}/lighthouse-history?startMs=${startMs}&endMs=${endMs}`),
+  siteUptime: (name: string) => get<UptimeStats>(`/api/sites/${encodeURIComponent(name)}/uptime`),
+  workerStats: (startMs: number, endMs: number) =>
+    get<WorkerStatPoint[]>(`/api/worker-stats?startMs=${startMs}&endMs=${endMs}`),
+  workerForecast: () => get<WorkerForecast>("/api/worker-forecast"),
+  annotations: (site?: string, startMs?: number, endMs?: number) => {
+    const params = new URLSearchParams();
+    if (site) params.set("site", site);
+    if (startMs != null) params.set("startMs", String(startMs));
+    if (endMs   != null) params.set("endMs",   String(endMs));
+    return get<Annotation[]>(`/api/annotations?${params}`);
+  },
+  createAnnotation: (data: { label: string; site?: string | null; ts?: number; color?: string }) =>
+    fetch("/api/annotations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then((r) => r.json() as Promise<Annotation>),
+  updateAnnotation: (id: number, data: { label?: string; ts?: number }) =>
+    fetch(`/api/annotations/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then((r) => r.json() as Promise<Annotation>),
+  deleteAnnotation: (id: number) =>
+    fetch(`/api/annotations/${id}`, { method: "DELETE" }).then((r) => r.json()),
   trigger: (site: string, type: "healthcheck" | "lighthouse") =>
     fetch(`/api/sites/${encodeURIComponent(site)}/trigger/${type}`, { method: "POST" })
       .then((r) => r.json() as Promise<{ triggered: boolean } | { error: string }>),

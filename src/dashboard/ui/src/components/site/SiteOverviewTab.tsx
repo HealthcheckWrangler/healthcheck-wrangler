@@ -1,6 +1,6 @@
 import { KpiTrend } from "../KpiTrend";
-import { cn } from "../../lib/utils";
-import type { KpiTrendPoint, LighthouseResult } from "../../api";
+import { cn, fmtRelative } from "../../lib/utils";
+import type { KpiTrendPoint, LighthouseResult, UptimeStats, Annotation } from "../../api";
 
 interface SiteOverviewTabProps {
   pagesUp: number;
@@ -9,12 +9,35 @@ interface SiteOverviewTabProps {
   pagesWithData: number;
   avgDuration: number | null;
   kpiTrend: KpiTrendPoint[];
-  latestLh: LighthouseResult | undefined;
+  latestLhPerPage: Map<string, LighthouseResult>;
+  uptime: UptimeStats | null;
+  annotations: Annotation[];
+}
+
+function avgOf(values: number[]): number {
+  return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
 export function SiteOverviewTab({
-  pagesUp, pagesDown, totalPages, pagesWithData, avgDuration, kpiTrend, latestLh,
+  pagesUp, pagesDown, totalPages, pagesWithData, avgDuration, kpiTrend, latestLhPerPage, uptime, annotations,
 }: SiteOverviewTabProps) {
+  const lhPages = [...latestLhPerPage.values()];
+  const hasLh = lhPages.length > 0;
+
+  // Average scores across pages, ignoring -1 (not measurable)
+  const avgScore = (key: keyof LighthouseResult["scores"]): number => {
+    const valid = lhPages.map((p) => p.scores[key]).filter((s) => s >= 0);
+    return valid.length > 0 ? Math.round(avgOf(valid)) : -1;
+  };
+
+  // Average metrics across pages
+  const avgMetric = (key: keyof LighthouseResult["metrics"]): number =>
+    lhPages.length > 0 ? avgOf(lhPages.map((p) => p.metrics[key])) : 0;
+
+  const mostRecentAudit = hasLh
+    ? Math.max(...lhPages.map((p) => p.recordedAt))
+    : null;
+
   return (
     <div className="p-6 space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -27,6 +50,7 @@ export function SiteOverviewTab({
             value: pt.checksTotal > 0 ? (pt.checksUp / pt.checksTotal) * 100 : 0,
           }))}
           trendColor={pagesDown === 0 ? "hsl(142 71% 45%)" : "hsl(0 63% 55%)"}
+          annotations={annotations}
         />
         <KpiTrend
           label="Avg. response — all pages"
@@ -36,29 +60,44 @@ export function SiteOverviewTab({
         />
       </div>
 
-      {latestLh?.scores && (
+      {uptime && (uptime.h24 != null || uptime.d7 != null || uptime.d30 != null) && (
         <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
-          <h3 className="mb-4 text-sm font-medium">Lighthouse Scores</h3>
+          <h3 className="mb-3 text-sm font-medium">Uptime</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <UptimeWindow label="Last 24h" value={uptime.h24} />
+            <UptimeWindow label="Last 7d"  value={uptime.d7} />
+            <UptimeWindow label="Last 30d" value={uptime.d30} />
+          </div>
+        </div>
+      )}
+
+      {hasLh && (
+        <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <div className="mb-4 flex items-baseline justify-between gap-2 flex-wrap">
+            <h3 className="text-sm font-medium">Lighthouse Scores</h3>
+            <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
+              Average of latest audit per page · {lhPages.length} page{lhPages.length !== 1 ? "s" : ""}
+              {mostRecentAudit != null && ` · last run ${fmtRelative(mostRecentAudit)}`}
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {(["performance", "accessibility", "best_practices", "seo"] as const).map((cat) => (
               <div key={cat} className="text-center">
-                <ScoreRing score={latestLh.scores[cat]} />
+                <ScoreRing score={avgScore(cat)} />
                 <div className="mt-1 text-xs capitalize text-[hsl(var(--muted-foreground))]">
                   {cat.replace("_", " ")}
                 </div>
               </div>
             ))}
           </div>
-          {latestLh.metrics && (
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 text-xs">
-              <Vital label="LCP"         value={`${latestLh.metrics.lcp_seconds.toFixed(2)}s`}         thresholdOk={latestLh.metrics.lcp_seconds < 2.5} />
-              <Vital label="FCP"         value={`${latestLh.metrics.fcp_seconds.toFixed(2)}s`}         thresholdOk={latestLh.metrics.fcp_seconds < 1.8} />
-              <Vital label="TTFB"        value={`${latestLh.metrics.ttfb_seconds.toFixed(2)}s`}        thresholdOk={latestLh.metrics.ttfb_seconds < 0.6} />
-              <Vital label="TBT"         value={`${latestLh.metrics.tbt_seconds.toFixed(2)}s`}         thresholdOk={latestLh.metrics.tbt_seconds < 0.2} />
-              <Vital label="CLS"         value={latestLh.metrics.cls.toFixed(3)}                       thresholdOk={latestLh.metrics.cls < 0.1} />
-              <Vital label="Speed Index" value={`${latestLh.metrics.speed_index_seconds.toFixed(2)}s`} thresholdOk={latestLh.metrics.speed_index_seconds < 3.4} />
-            </div>
-          )}
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 text-xs">
+            <Vital label="LCP"         value={`${avgMetric("lcp_seconds").toFixed(2)}s`}         thresholdOk={avgMetric("lcp_seconds") < 2.5} />
+            <Vital label="FCP"         value={`${avgMetric("fcp_seconds").toFixed(2)}s`}         thresholdOk={avgMetric("fcp_seconds") < 1.8} />
+            <Vital label="TTFB"        value={`${avgMetric("ttfb_seconds").toFixed(2)}s`}        thresholdOk={avgMetric("ttfb_seconds") < 0.6} />
+            <Vital label="TBT"         value={`${avgMetric("tbt_seconds").toFixed(2)}s`}         thresholdOk={avgMetric("tbt_seconds") < 0.2} />
+            <Vital label="CLS"         value={avgMetric("cls").toFixed(3)}                       thresholdOk={avgMetric("cls") < 0.1} />
+            <Vital label="Speed Index" value={`${avgMetric("speed_index_seconds").toFixed(2)}s`} thresholdOk={avgMetric("speed_index_seconds") < 3.4} />
+          </div>
         </div>
       )}
     </div>
@@ -79,6 +118,23 @@ export function ScoreRing({ score }: { score: number }) {
         {score}
       </text>
     </svg>
+  );
+}
+
+function uptimeColor(pct: number): string {
+  if (pct >= 99) return "text-[hsl(var(--success))]";
+  if (pct >= 95) return "text-[hsl(var(--warning))]";
+  return "text-[hsl(var(--destructive))]";
+}
+
+export function UptimeWindow({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="rounded-lg bg-[hsl(var(--muted))] px-4 py-3 text-center">
+      <div className={cn("text-xl font-bold tabular-nums", value != null ? uptimeColor(value) : "text-[hsl(var(--muted-foreground))]")}>
+        {value != null ? `${value.toFixed(2)}%` : "—"}
+      </div>
+      <div className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">{label}</div>
+    </div>
   );
 }
 

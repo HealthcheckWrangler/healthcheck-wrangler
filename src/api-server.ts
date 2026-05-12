@@ -10,8 +10,11 @@ import {
   getFleetStatusTimeline,
   getSitePageTimeline,
   getSiteKpiTrend,
+  getSiteUptimeStats,
 } from "./db/healthchecks.js";
 import { getLighthouseHistoryForRange } from "./db/lighthouse.js";
+import { insertAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from "./db/annotations.js";
+import { getWorkerStats } from "./db/worker-stats.js";
 
 interface ApiDeps {
   scheduler: Scheduler;
@@ -20,6 +23,7 @@ interface ApiDeps {
   sql: postgres.Sql;
   startedAt: number;
   maxWorkers: number;
+  workerMonitoring: boolean;
 }
 
 import type { StoredHealthcheck } from "./results-store.js";
@@ -63,6 +67,15 @@ function mapLighthouse(row: StoredLighthouse) {
     timestamp: row.ts instanceof Date ? row.ts.toISOString() : String(row.ts),
     recordedAt: row.ts instanceof Date ? row.ts.getTime() : Number(row.ts),
   };
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
 }
 
 function json(res: ServerResponse, data: unknown, status = 200): void {
@@ -110,7 +123,7 @@ async function handleSites(req: IncomingMessage, res: ServerResponse, deps: ApiD
     const [rawLatest, hcHistory, lhHistory] = await Promise.all([
       deps.results.getPageLatest(siteName, pages),
       deps.results.getHealthcheckHistory(siteName),
-      deps.results.getLighthouseHistory(siteName),
+      deps.results.getAllLatestLighthouse(siteName),
     ]);
     const pageLatest = Object.fromEntries(
       Object.entries(rawLatest).map(([k, v]) => [
@@ -155,6 +168,7 @@ async function handleSchedule(req: IncomingMessage, res: ServerResponse, deps: A
     nextRun: t.nextRun,
     nextRunInSeconds: Math.max(0, Math.round((t.nextRun - now) / 1000)),
     running: deps.scheduler.isRunning(`${t.type}:${t.site}`),
+    triggeredAt: t.triggeredAt ?? null,
   }));
   json(res, tasks);
 }
@@ -223,7 +237,7 @@ function handleSystem(_req: IncomingMessage, res: ServerResponse): void {
 
 async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): Promise<void> {
   if (req.method === "OPTIONS") {
-    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST" });
+    res.writeHead(204, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE" });
     res.end();
     return;
   }
@@ -231,17 +245,17 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): 
   const url = new URL(req.url!, `http://localhost`);
   const path = url.pathname;
 
-  if (req.method === "POST") {
-    if (path === "/api/runner/pause") {
+  if (req.method === "POST" || req.method === "PUT" || req.method === "DELETE") {
+    if (req.method === "POST" && path === "/api/runner/pause") {
       deps.scheduler.pause();
       json(res, { paused: true }); return;
     }
-    if (path === "/api/runner/resume") {
+    if (req.method === "POST" && path === "/api/runner/resume") {
       deps.scheduler.resume();
       json(res, { paused: false }); return;
     }
     const triggerMatch = path.match(/^\/api\/sites\/([^/]+)\/trigger\/(healthcheck|lighthouse)$/);
-    if (triggerMatch) {
+    if (req.method === "POST" && triggerMatch) {
       const site = decodeURIComponent(triggerMatch[1]!);
       const type = triggerMatch[2] as "healthcheck" | "lighthouse";
       const key = `${type}:${site}`;
@@ -253,6 +267,47 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): 
         json(res, { error: "task not found — check may be disabled" }, 404); return;
       }
       json(res, { triggered: true }); return;
+    }
+    if (req.method === "POST" && path === "/api/annotations") {
+      const body = await readBody(req);
+      let data: { label?: unknown; site?: unknown; ts?: unknown; color?: unknown };
+      try { data = JSON.parse(body); } catch { json(res, { error: "invalid JSON" }, 400); return; }
+      if (!data.label || typeof data.label !== "string") {
+        json(res, { error: "label is required" }, 400); return;
+      }
+      const row = await insertAnnotation(deps.sql, {
+        label: data.label,
+        site: typeof data.site === "string" ? data.site : null,
+        ts: typeof data.ts === "number" ? new Date(data.ts) : undefined,
+        color: typeof data.color === "string" ? data.color : undefined,
+      });
+      json(res, {
+        id: row.id,
+        ts: row.ts instanceof Date ? row.ts.getTime() : Number(row.ts),
+        label: row.label, site: row.site, color: row.color,
+      }, 201);
+      return;
+    }
+    const annotationIdMatch = path.match(/^\/api\/annotations\/(\d+)$/);
+    if (annotationIdMatch?.[1]) {
+      const id = Number(annotationIdMatch[1]);
+      if (req.method === "PUT") {
+        const body = await readBody(req);
+        let data: { label?: unknown; ts?: unknown };
+        try { data = JSON.parse(body); } catch { json(res, { error: "invalid JSON" }, 400); return; }
+        const row = await updateAnnotation(deps.sql, id, {
+          label: typeof data.label === "string" ? data.label : undefined,
+          ts:    typeof data.ts    === "number" ? new Date(data.ts) : undefined,
+        });
+        if (!row) { json(res, { error: "not found" }, 404); return; }
+        json(res, { id: row.id, ts: row.ts instanceof Date ? row.ts.getTime() : Number(row.ts), label: row.label, site: row.site, color: row.color });
+        return;
+      }
+      if (req.method === "DELETE") {
+        await deleteAnnotation(deps.sql, id);
+        json(res, { deleted: true });
+        return;
+      }
     }
     json(res, { error: "not found" }, 404); return;
   }
@@ -302,6 +357,14 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): 
     return;
   }
 
+  const uptimeMatch = path.match(/^\/api\/sites\/([^/]+)\/uptime$/);
+  if (uptimeMatch?.[1]) {
+    const site = decodeURIComponent(uptimeMatch[1]);
+    const stats = await getSiteUptimeStats(deps.sql, site);
+    json(res, stats);
+    return;
+  }
+
   const siteKpiMatch = path.match(/^\/api\/sites\/([^/]+)\/kpi-trend$/);
   if (siteKpiMatch?.[1]) {
     const site = decodeURIComponent(siteKpiMatch[1]);
@@ -338,6 +401,105 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): 
       cls:   Number(r.cls  ?? 0),
       tbt:   Number(r.tbt  ?? 0),
     })));
+    return;
+  }
+
+  if (path === "/api/annotations") {
+    const p = url.searchParams;
+    const startMs = p.has("startMs") ? Number(p.get("startMs")) : undefined;
+    const endMs   = p.has("endMs")   ? Number(p.get("endMs"))   : undefined;
+    const site    = p.get("site") ?? undefined;
+    const rows = await getAnnotations(deps.sql, site, startMs, endMs);
+    json(res, rows.map((r) => ({
+      id: r.id,
+      ts: r.ts instanceof Date ? r.ts.getTime() : Number(r.ts),
+      label: r.label,
+      site: r.site,
+      color: r.color,
+    })));
+    return;
+  }
+
+  if (path === "/api/worker-stats" || path === "/api/worker-forecast") {
+    if (!deps.workerMonitoring) { json(res, { error: "worker monitoring is disabled" }, 404); return; }
+  }
+
+  if (path === "/api/worker-stats") {
+    const p = url.searchParams;
+    const startMs = p.has("startMs") ? Number(p.get("startMs")) : Date.now() - 24 * 3_600_000;
+    const endMs   = p.has("endMs")   ? Number(p.get("endMs"))   : Date.now();
+    const rows = await getWorkerStats(deps.sql, startMs, endMs);
+    json(res, rows.map((r) => ({
+      ts:         r.ts instanceof Date ? r.ts.getTime() : Number(r.ts),
+      utilPct:    Number(r.util_pct ?? 0),
+      queueDepth: Number(r.queue_depth ?? 0),
+      activeLh:   Number(r.active_lh ?? 0),
+      activeHc:   Number(r.active_hc ?? 0),
+      maxWorkers: Number(r.max_workers ?? deps.maxWorkers),
+    })));
+    return;
+  }
+
+  if (path === "/api/worker-forecast") {
+    const maxWorkers = deps.maxWorkers;
+    const avgDurationMs = deps.scheduler.avgTaskDurationMs || 30_000;
+    const sampleCount = deps.scheduler.completionCount;
+    const tasks = deps.scheduler.taskList;
+    const tasksPerHour = tasks.reduce((s, t) => s + 3_600_000 / t.intervalMs, 0);
+    const requiredCapacity = tasksPerHour * (avgDurationMs / 3_600_000);
+
+    const totalMem = os.totalmem();
+    const processRss = process.memoryUsage().rss;
+    const perWorkerRss = processRss / Math.max(1, deps.scheduler.inFlightCount || maxWorkers);
+
+    const scenarioFor = (n: number) => {
+      const satPct = Math.round(Math.min((requiredCapacity / Math.max(n, 1)) * 100, 999));
+      const capacityTasksPerHour = n > 0 ? Math.round(n / (avgDurationMs / 3_600_000)) : 0;
+      const overflowTasksPerHr = Math.max(0, tasksPerHour - capacityTasksPerHour);
+      const avgWaitMs = overflowTasksPerHr > 0
+        ? Math.round((overflowTasksPerHr / Math.max(tasksPerHour, 1)) * avgDurationMs)
+        : 0;
+      const estimatedRamMb = Math.round((perWorkerRss * n) / 1_048_576);
+      const projectedMemPct = Math.round(((os.totalmem() - os.freemem() - processRss + perWorkerRss * n) / totalMem) * 100);
+      return { workers: n, satPct, avgWaitMs, estimatedRamMb, tasksPerHourCapacity: capacityTasksPerHour, projectedMemPct };
+    };
+
+    const current = scenarioFor(maxWorkers);
+    const plus1   = scenarioFor(maxWorkers + 1);
+    const minus1  = maxWorkers > 1 ? scenarioFor(maxWorkers - 1) : null;
+
+    const recommendations: string[] = [];
+    if (deps.scheduler.queueDepth > 0) {
+      recommendations.push("Tasks are currently queued — workers cannot keep up with demand right now.");
+    }
+    if (current.satPct > 90) {
+      recommendations.push("Workers are near or over capacity. Consider adding a worker (`runner.workers`).");
+      if (plus1.projectedMemPct > 85) {
+        recommendations.push("Adding a worker may push container RAM above 85%. Consider increasing Docker memory allocation first.");
+      }
+      const avgIntervalMin = tasks.length > 0
+        ? Math.round(tasks.reduce((s, t) => s + t.intervalMs, 0) / tasks.length / 60_000)
+        : 0;
+      if (avgIntervalMin > 0 && avgIntervalMin < 30) {
+        const suggested = Math.round(avgIntervalMin * (tasksPerHour / (requiredCapacity * 0.75)));
+        recommendations.push(`Alternatively, increasing check intervals (currently avg ${avgIntervalMin}m) to ~${suggested}m would reduce load to ~75% capacity without adding a worker.`);
+      }
+    } else if (current.satPct < 25 && maxWorkers > 1) {
+      recommendations.push(`Workers are mostly idle (${current.satPct}% utilization). Reducing to ${maxWorkers - 1} worker(s) would free ~${Math.round(perWorkerRss / 1_048_576)} MB RAM with minimal impact.`);
+    } else if (current.satPct <= 90 && current.satPct >= 25) {
+      recommendations.push("Worker utilization is healthy. No changes needed.");
+    }
+
+    const scenarios = [...(minus1 ? [minus1] : []), current, plus1];
+    json(res, {
+      scenarios,
+      recommendations,
+      sampleCount,
+      avgDurationMs,
+      currentQueueDepth: deps.scheduler.queueDepth,
+      tasksPerHour: Math.round(tasksPerHour * 10) / 10,
+      maxWorkers,
+    });
     return;
   }
 
