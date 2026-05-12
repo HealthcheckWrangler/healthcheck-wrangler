@@ -99,10 +99,39 @@ export async function initSchema(
   await sql`CREATE INDEX IF NOT EXISTS idx_logs_site_ts  ON logs(site, ts DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_logs_fts      ON logs USING gin(to_tsvector('english', msg))`;
 
+  // annotations — user-created event markers shown on charts
+  await sql`
+    CREATE TABLE IF NOT EXISTS annotations (
+      id     SERIAL PRIMARY KEY,
+      ts     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      label  TEXT        NOT NULL,
+      site   TEXT,
+      color  TEXT        NOT NULL DEFAULT '#6366f1'
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_annotations_ts      ON annotations(ts DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_annotations_site_ts ON annotations(site, ts DESC)`;
+
+  // worker utilization samples — one row per minute
+  await sql`
+    CREATE TABLE IF NOT EXISTS worker_stats (
+      ts               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      active_total     SMALLINT    NOT NULL,
+      active_hc        SMALLINT    NOT NULL,
+      active_lh        SMALLINT    NOT NULL,
+      max_workers      SMALLINT    NOT NULL,
+      queue_depth      SMALLINT    NOT NULL,
+      utilization_pct  FLOAT       NOT NULL
+    )
+  `;
+  await sql`SELECT create_hypertable('worker_stats', by_range('ts'), if_not_exists => TRUE)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_worker_stats_ts ON worker_stats(ts DESC)`;
+
   // Retention policies — only add if not already present
   await applyRetention(sql, "healthchecks",      retentionDays.results);
   await applyRetention(sql, "lighthouse_results", retentionDays.results);
   await applyRetention(sql, "logs",               retentionDays.logs);
+  await applyRetention(sql, "worker_stats",       retentionDays.results);
 }
 
 async function applyRetention(sql: postgres.Sql, table: string, days: number): Promise<void> {

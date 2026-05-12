@@ -4,6 +4,7 @@ import { Layout } from "./components/Layout";
 import { Overview } from "./pages/Overview";
 import { SiteDashboard } from "./pages/SiteDashboard";
 import { Logs } from "./pages/Logs";
+import { WorkersDashboard } from "./pages/WorkersDashboard";
 import { api, type RunnerStatus, type Site } from "./api";
 import { TimeRangeProvider } from "./lib/time-range";
 import { ThemeProvider } from "./lib/theme";
@@ -31,6 +32,7 @@ export function App() {
               <Route path="/" element={<Overview />} />
               <Route path="/sites/:name" element={<SiteDashboard />} />
               <Route path="/logs" element={<Logs />} />
+              <Route path="/workers" element={<WorkersDashboard />} />
             </Routes>
           </Layout>
         </TimeRangeProvider>

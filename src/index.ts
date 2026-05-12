@@ -13,6 +13,7 @@ import { ResultsStore } from "./results-store.js";
 import { getClient, closeClient, isDatabaseConfigured } from "./db/client.js";
 import { initSchema } from "./db/schema.js";
 import { getLatestHealthcheck, type StoredHealthcheck } from "./db/healthchecks.js";
+import { insertWorkerStat } from "./db/worker-stats.js";
 import { startApiServer } from "./api-server.js";
 import { AlertManager } from "./alerting/index.js";
 import type { DetailedHealthcheckResult } from "./runner/healthcheck.js";
@@ -115,10 +116,11 @@ async function main(): Promise<void> {
       sql,
       startedAt: Date.now(),
       maxWorkers: config.runner.workers,
+      workerMonitoring: config.runner.workerMonitoring,
     });
   }
 
-  // Resource monitoring — sample every 60s and alert on threshold crossings
+  // Resource monitoring — sample every 60s, alert on thresholds, record worker stats
   const resourceInterval = setInterval(async () => {
     const totalMem = os.totalmem();
     const freeMem  = os.freemem();
@@ -129,6 +131,17 @@ async function main(): Promise<void> {
       load1m:        os.loadavg()[0] ?? 0,
       cpuCount:      os.cpus().length,
     });
+    if (sql && config.runner.workerMonitoring) {
+      const active = scheduler.inFlightCount;
+      await insertWorkerStat(sql, {
+        active_total:    active,
+        active_hc:       active - scheduler.lighthouseInFlightCount,
+        active_lh:       scheduler.lighthouseInFlightCount,
+        max_workers:     config.runner.workers,
+        queue_depth:     scheduler.queueDepth,
+        utilization_pct: (active / config.runner.workers) * 100,
+      }).catch(() => {});
+    }
   }, 60_000);
 
   // Periodic lighthouse report cleanup (every 24h)
@@ -171,7 +184,8 @@ async function main(): Promise<void> {
             await results?.recordHealthcheck(result);
             scheduler.incrementProgress(key);
             pageResults.push({ page, result });
-            if (config.runner.pageDelayMs > 0) await sleep(config.runner.pageDelayMs);
+            const hcDelay = site.pageDelayMs ?? config.runner.pageDelayMs;
+            if (hcDelay > 0) await sleep(hcDelay);
           }
         } finally {
           await browser.close().catch(() => {});
@@ -196,6 +210,8 @@ async function main(): Promise<void> {
           await results?.recordLighthouse(result);
         }
         scheduler.incrementProgress(key);
+        const lhDelay = site.pageDelayMs ?? config.runner.pageDelayMs;
+        if (lhDelay > 0) await sleep(lhDelay);
       }
     })();
   };
@@ -224,7 +240,7 @@ async function main(): Promise<void> {
       for (const task of due) {
         const key = `${task.type}:${task.site}`;
         if (scheduler.isRunning(key)) continue;
-        if (task.type === "lighthouse" && scheduler.hasLighthouseRunning()) continue;
+        if (task.type === "lighthouse" && scheduler.lighthouseInFlightCount >= config.runner.lighthouseWorkers) continue;
         if (scheduler.inFlightCount >= config.runner.workers) break;
 
         logger.info({ site: task.site, type: task.type, workers: scheduler.inFlightCount + 1 }, "task started");
@@ -239,6 +255,13 @@ async function main(): Promise<void> {
         dispatched++;
         idleLoggedAt = 0;
       }
+
+      // Update queue depth: due tasks that couldn't start because workers are full
+      const queueDepth = due.filter((task) => {
+        const key = `${task.type}:${task.site}`;
+        return !scheduler.isRunning(key) && scheduler.inFlightCount >= config.runner.workers;
+      }).length;
+      scheduler.setQueueDepth(queueDepth);
 
       if (dispatched === 0 && due.length === 0 && now - idleLoggedAt > 60_000) {
         const next = scheduler.nextDue();

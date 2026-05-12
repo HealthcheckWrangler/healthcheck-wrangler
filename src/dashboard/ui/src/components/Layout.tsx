@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { ChevronUp, LayoutDashboard, Menu, Moon, Pause, Play, ScrollText, Sun, Wifi, WifiOff, X } from "lucide-react";
+import { ChevronUp, Cpu, LayoutDashboard, Menu, Moon, Pause, Play, ScrollText, Sun, Wifi, WifiOff, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { api, type RunnerStatus, type TaskStatus, type Site } from "../api";
 import { TimeRangePicker } from "./TimeRangePicker";
@@ -65,6 +65,7 @@ export function Layout({ children, status, sites }: LayoutProps) {
         <nav className="flex-1 overflow-y-auto p-2">
           <NavItem to="/" icon={<LayoutDashboard className="h-4 w-4" />} label="Overview" exact />
           <NavItem to="/logs" icon={<ScrollText className="h-4 w-4" />} label="Logs" />
+          <NavItem to="/workers" icon={<Cpu className="h-4 w-4" />} label="Workers" />
 
           {sites.length > 0 && (
             <>
@@ -81,6 +82,7 @@ export function Layout({ children, status, sites }: LayoutProps) {
                     to={`/sites/${site.name}`}
                     className={cn(
                       "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                      !site.enabled && "opacity-50 italic",
                       isActive
                         ? "bg-[hsl(var(--accent))] text-[hsl(var(--foreground))]"
                         : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]",
@@ -89,11 +91,13 @@ export function Layout({ children, status, sites }: LayoutProps) {
                     <span
                       className={cn(
                         "h-1.5 w-1.5 rounded-full flex-shrink-0",
-                        latestHc == null
-                          ? "bg-[hsl(var(--muted-foreground))]"
-                          : isUp
-                            ? "bg-[hsl(var(--success))]"
-                            : "bg-[hsl(var(--destructive))]",
+                        !site.enabled
+                          ? "bg-[hsl(var(--muted-foreground)/0.4)]"
+                          : latestHc == null
+                            ? "bg-[hsl(var(--muted-foreground))]"
+                            : isUp
+                              ? "bg-[hsl(var(--success))]"
+                              : "bg-[hsl(var(--destructive))]",
                       )}
                     />
                     <span className="truncate">{site.name}</span>
