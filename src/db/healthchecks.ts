@@ -192,6 +192,35 @@ export async function getSitePageTimeline(
   return [...map.entries()].map(([name, points]) => ({ name, points }));
 }
 
+export interface UptimeStats {
+  h24: number | null;
+  d7:  number | null;
+  d30: number | null;
+}
+
+export async function getSiteUptimeStats(
+  sql: postgres.Sql,
+  site: string,
+): Promise<UptimeStats> {
+  const rows = await sql<[{ h24: string | null; d7: string | null; d30: string | null }]>`
+    SELECT
+      COUNT(*) FILTER (WHERE up AND ts > NOW() - INTERVAL '24 hours')::float /
+        NULLIF(COUNT(*) FILTER (WHERE ts > NOW() - INTERVAL '24 hours'), 0) * 100 AS h24,
+      COUNT(*) FILTER (WHERE up AND ts > NOW() - INTERVAL '7 days')::float /
+        NULLIF(COUNT(*) FILTER (WHERE ts > NOW() - INTERVAL '7 days'), 0) * 100 AS d7,
+      COUNT(*) FILTER (WHERE up AND ts > NOW() - INTERVAL '30 days')::float /
+        NULLIF(COUNT(*) FILTER (WHERE ts > NOW() - INTERVAL '30 days'), 0) * 100 AS d30
+    FROM healthchecks
+    WHERE site = ${site}
+  `;
+  const row = rows[0];
+  return {
+    h24: row?.h24 != null ? Number(row.h24) : null,
+    d7:  row?.d7  != null ? Number(row.d7)  : null,
+    d30: row?.d30 != null ? Number(row.d30) : null,
+  };
+}
+
 export async function getSiteKpiTrend(
   sql: postgres.Sql,
   site: string,
