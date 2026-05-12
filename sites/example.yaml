@@ -5,9 +5,23 @@ name: example-site
 # Root URL of the site. All page paths below are resolved relative to this.
 baseUrl: https://example.com
 
-# Whether to fire channel alerts for this site.
-# Set to false to monitor silently while a site is being onboarded.
+# Master switch. Set to true once selectors are validated and you're ready to monitor.
+enabled: false
+
+# Alerting behaviour for this site. Three forms are accepted:
+#
+#   alerting: true          — use default channels from config.yaml (default)
+#   alerting: false         — disable all alerts for this site
+#   alerting:               — delta from the global defaults
+#     add: [channel-name]   —   add channels not in the default list
+#     remove: [channel-name] —  suppress channels that are in the default list
+#
 alerting: true
+
+# Milliseconds to wait between page requests within this site (both healthcheck and Lighthouse).
+# Overrides runner.pageDelayMs from config.yaml for this site only.
+# Useful for servers that get overloaded by rapid sequential requests.
+# pageDelayMs: 2000
 
 healthcheck:
   # Master switch. Keep false until you've validated selectors with `hcw check --site <name>`.

@@ -12,6 +12,8 @@ const ProjectSchema = z
 const RunnerSchema = z
   .object({
     workers: z.number().int().positive().default(3),
+    lighthouseWorkers: z.number().int().positive().default(1),
+    workerMonitoring: z.boolean().default(true),
     pageDelayMs: z.number().int().min(0).default(0),
     sitesDir: z.string().default("./sites"),
     reportsDir: z.string().default("./reports"),
@@ -63,7 +65,7 @@ const AlertEventTypeSchema = z.enum([
 
 const GoogleChatChannelSchema = z.object({
   type: z.literal("google-chat"),
-  name: z.string().optional(),
+  name: z.string().min(1),
   webhookUrl: z.string().url(),
   on: z.array(AlertEventTypeSchema).default(["site-down", "site-recovery"]),
 });
@@ -72,6 +74,12 @@ const ChannelSchema = z.discriminatedUnion("type", [GoogleChatChannelSchema]);
 
 const AlertingSchema = z
   .object({
+    defaults: z
+      .object({
+        // Channel names applied to all sites. Omit to apply all defined channels by default.
+        channels: z.array(z.string()).optional(),
+      })
+      .default({}),
     channels: z.array(ChannelSchema).default([]),
   })
   .default({});

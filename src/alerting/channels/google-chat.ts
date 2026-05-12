@@ -2,7 +2,7 @@ import { logger } from "../../logger.js";
 import type { AlertChannel, AlertEvent, AlertEventType, FailingPage } from "../types.js";
 
 export interface GoogleChatChannelConfig {
-  name?: string;
+  name: string;
   webhookUrl: string;
   on: AlertEventType[];
 }
@@ -56,9 +56,11 @@ function buildText(event: AlertEvent): string {
 }
 
 export class GoogleChatChannel implements AlertChannel {
+  readonly name: string;
   private readonly config: GoogleChatChannelConfig;
 
   constructor(config: GoogleChatChannelConfig) {
+    this.name = config.name;
     this.config = config;
   }
 
@@ -67,7 +69,7 @@ export class GoogleChatChannel implements AlertChannel {
   }
 
   async send(event: AlertEvent): Promise<void> {
-    const channelName = this.config.name ?? "google-chat";
+    const channelName = this.config.name;
 
     try {
       const res = await fetch(this.config.webhookUrl, {

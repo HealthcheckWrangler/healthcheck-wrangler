@@ -43,6 +43,7 @@ async function action(nameArg: string | undefined, baseUrlArg: string | undefine
 
   const template = `name: ${name}
 baseUrl: ${baseUrl}
+enabled: false
 alerting: true
 healthcheck:
   enabled: false
@@ -69,7 +70,8 @@ pages:
   console.log(`  1. Edit ${chalk.cyan(`sites/${name}.yaml`)} — add pages and selectors`);
   console.log(`  2. Validate:   ${chalk.cyan(`hcw check --site ${name} --headed`)}`);
   console.log(`  3. Dry-run LH: ${chalk.cyan(`hcw lighthouse --site ${name}`)}`);
-  console.log(`  4. Commit the YAML — the running daemon hot-reloads it automatically.`);
+  console.log(`  4. Enable:     set ${chalk.cyan("enabled: true")} in ${chalk.cyan(`sites/${name}.yaml`)}`);
+  console.log(`  5. Commit the YAML — the running daemon hot-reloads it automatically.`);
 }
 
 export const addSiteCommand = new Command("add-site")

@@ -34,6 +34,7 @@ export interface AlertEvent {
 }
 
 export interface AlertChannel {
+  readonly name: string;
   handles(eventType: AlertEventType): boolean;
   send(event: AlertEvent): Promise<void>;
 }

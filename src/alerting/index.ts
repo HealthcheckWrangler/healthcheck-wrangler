@@ -12,35 +12,40 @@ const MEM_RECOVER_PCT = 70;
 const LOAD_DANGER_RATIO  = 0.9;  // load > 90% of CPU count
 const LOAD_RECOVER_RATIO = 0.6;  // load < 60% of CPU count
 
-function buildChannels(config: RuntimeConfig): AlertChannel[] {
-  return (config.alerting.channels ?? []).map((ch) => {
+function buildChannelMap(config: RuntimeConfig): Map<string, AlertChannel> {
+  const map = new Map<string, AlertChannel>();
+  for (const ch of config.alerting.channels ?? []) {
     if (ch.type === "google-chat") {
-      return new GoogleChatChannel({
+      map.set(ch.name, new GoogleChatChannel({
         name: ch.name,
         webhookUrl: ch.webhookUrl,
         on: ch.on as AlertEventType[],
-      });
+      }));
+    } else {
+      throw new Error(`unknown alert channel type: ${(ch as { type: string }).type}`);
     }
-    throw new Error(`unknown alert channel type: ${(ch as { type: string }).type}`);
-  });
+  }
+  return map;
 }
 
 export class AlertManager {
-  private readonly channels: AlertChannel[];
+  private readonly channelMap: Map<string, AlertChannel>;
+  private readonly defaultChannelNames: string[] | undefined;
 
   // In-memory resource alert state — no DB needed, these are transient
   private memHighState  = false;
   private loadHighState = false;
 
   constructor(config: RuntimeConfig) {
-    this.channels = buildChannels(config);
-    if (this.channels.length > 0) {
-      logger.info({ channels: this.channels.length }, "alert manager initialised");
+    this.channelMap = buildChannelMap(config);
+    this.defaultChannelNames = config.alerting.defaults?.channels;
+    if (this.channelMap.size > 0) {
+      logger.info({ channels: this.channelMap.size }, "alert manager initialised");
     }
   }
 
   get enabled(): boolean {
-    return this.channels.length > 0;
+    return this.channelMap.size > 0;
   }
 
   // ── Site healthcheck alerts ────────────────────────────────────────────────
@@ -50,8 +55,8 @@ export class AlertManager {
     prevStates: Map<string, StoredHealthcheck | null>,
     site: Site,
   ): Promise<void> {
-    if (!site.alerting) return;
-    if (this.channels.length === 0) return;
+    const channels = this.channelsForSite(site);
+    if (channels.length === 0) return;
     if (pageResults.length === 0) return;
 
     const wasAllUp = pageResults.every(({ page }) => prevStates.get(page.name)?.up ?? true);
@@ -80,7 +85,7 @@ export class AlertManager {
         selectorsTotal: result.selectorsTotal,
         navigationError: result.error,
       })),
-    }, { site: site.name, pagesDown: failing.length, pagesTotal: pageResults.length });
+    }, channels, { site: site.name, pagesDown: failing.length, pagesTotal: pageResults.length });
   }
 
   // ── Resource alerts ────────────────────────────────────────────────────────
@@ -92,7 +97,8 @@ export class AlertManager {
     load1m: number;
     cpuCount: number;
   }): Promise<void> {
-    if (this.channels.length === 0) return;
+    const allChannels = [...this.channelMap.values()];
+    if (allChannels.length === 0) return;
 
     // Memory
     const isHighMem = stats.memPct >= MEM_DANGER_PCT;
@@ -104,7 +110,7 @@ export class AlertManager {
         memPct: stats.memPct,
         memUsedBytes: stats.memUsedBytes,
         memTotalBytes: stats.memTotalBytes,
-      }, { memPct: stats.memPct });
+      }, allChannels, { memPct: stats.memPct });
     } else if (this.memHighState && stats.memPct < MEM_RECOVER_PCT) {
       this.memHighState = false;
       await this.dispatch({
@@ -113,7 +119,7 @@ export class AlertManager {
         memPct: stats.memPct,
         memUsedBytes: stats.memUsedBytes,
         memTotalBytes: stats.memTotalBytes,
-      }, { memPct: stats.memPct });
+      }, allChannels, { memPct: stats.memPct });
     }
 
     // CPU load
@@ -126,7 +132,7 @@ export class AlertManager {
         timestamp: new Date(),
         loadAvg: stats.load1m,
         cpuCount: stats.cpuCount,
-      }, { load1m: stats.load1m, cpuCount: stats.cpuCount });
+      }, allChannels, { load1m: stats.load1m, cpuCount: stats.cpuCount });
     } else if (this.loadHighState && loadRatio < LOAD_RECOVER_RATIO) {
       this.loadHighState = false;
       await this.dispatch({
@@ -134,14 +140,42 @@ export class AlertManager {
         timestamp: new Date(),
         loadAvg: stats.load1m,
         cpuCount: stats.cpuCount,
-      }, { load1m: stats.load1m, cpuCount: stats.cpuCount });
+      }, allChannels, { load1m: stats.load1m, cpuCount: stats.cpuCount });
     }
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────
 
-  private async dispatch(event: AlertEvent, logCtx: Record<string, unknown>): Promise<void> {
-    const targets = this.channels.filter((c) => c.handles(event.type));
+  private channelsForSite(site: Site): AlertChannel[] {
+    if (site.alerting === false) return [];
+
+    // Base set: explicitly configured defaults, or all channels if defaults not set
+    const baseNames = this.defaultChannelNames ?? [...this.channelMap.keys()];
+
+    let effectiveNames: string[];
+    if (site.alerting === true) {
+      effectiveNames = baseNames;
+    } else {
+      const { add = [], remove = [] } = site.alerting;
+      effectiveNames = [...new Set([...baseNames, ...add])].filter((n) => !remove.includes(n));
+    }
+
+    return effectiveNames.flatMap((n) => {
+      const ch = this.channelMap.get(n);
+      if (!ch) {
+        logger.warn({ channel: n, site: site.name }, "site references unknown alert channel");
+        return [];
+      }
+      return [ch];
+    });
+  }
+
+  private async dispatch(
+    event: AlertEvent,
+    channels: AlertChannel[],
+    logCtx: Record<string, unknown>,
+  ): Promise<void> {
+    const targets = channels.filter((c) => c.handles(event.type));
     if (targets.length === 0) return;
     logger.info({ event: event.type, channels: targets.length, ...logCtx }, "dispatching alert");
     await Promise.allSettled(targets.map((c) => c.send(event)));

@@ -65,13 +65,25 @@ function createSiteSchema(config: RuntimeConfig) {
     })
     .default({});
 
+  const SiteAlertingSchema = z
+    .union([
+      z.boolean(),
+      z.object({
+        add: z.array(z.string()).default([]),
+        remove: z.array(z.string()).default([]),
+      }),
+    ])
+    .default(true);
+
   return z.object({
     name: z
       .string()
       .min(1)
       .regex(/^[a-z0-9][a-z0-9_-]*$/, "name must be kebab/snake-case lowercase"),
     baseUrl: z.string().url(),
-    alerting: z.boolean().default(true),
+    enabled: z.boolean().default(true),
+    alerting: SiteAlertingSchema,
+    pageDelayMs: z.number().int().min(0).optional(),
     healthcheck: HealthcheckSchema,
     lighthouse: LighthouseSchema,
     pages: z.array(PageSchema).min(1),
