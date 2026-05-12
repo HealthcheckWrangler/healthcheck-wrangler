@@ -2,6 +2,30 @@
 
 Playwright-based site monitoring with Lighthouse audits, a built-in status dashboard, and persistent storage via TimescaleDB. Checks that key page elements are visible, measures Core Web Vitals, and stores everything in a queryable database with a real-time web UI.
 
+---
+
+## Dashboard
+
+<p align="center">
+  <img src="docs/screenshots/overview.png" alt="Overview — fleet status timeline and site cards" width="900">
+  <br><em>Fleet status timeline · server resource monitor · per-site uptime cards</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/site-overview.png" alt="Site detail — KPI trend sparklines and Lighthouse scores" width="900">
+  <br><em>Site detail · availability sparklines · latest Lighthouse score rings and Core Web Vitals</em>
+</p>
+
+<table align="center"><tr>
+<td><img src="docs/screenshots/site-lighthouse.png" alt="Lighthouse history charts" width="440"></td>
+<td><img src="docs/screenshots/logs.png" alt="Log viewer" width="440"></td>
+</tr><tr>
+<td align="center"><em>Lighthouse score and Core Web Vitals history</em></td>
+<td align="center"><em>Live log stream with level filter and full-text search</em></td>
+</tr></table>
+
+---
+
 ## How it works
 
 The runner loads site configs from a `sites/` directory. For each site it:
@@ -58,7 +82,10 @@ Each site is a YAML file in `sites/`. See [`sites/example.yaml`](sites/example.y
 ```yaml
 name: my-site
 baseUrl: https://example.com
-alerting: true
+enabled: true        # set false to disable all monitoring (site still appears in dashboard)
+alerting: true       # true = use defaults | false = silent | {add:[...], remove:[...]} = override
+
+# pageDelayMs: 2000  # wait 2s between page requests (for servers that can't handle rapid hits)
 
 healthcheck:
   enabled: true
@@ -67,7 +94,7 @@ healthcheck:
 lighthouse:
   enabled: true
   intervalMinutes: 360
-  throttling: mobile
+  throttling: mobile   # mobile | desktop
 
 pages:
   - path: /
@@ -151,16 +178,21 @@ Options:
 
 See [`config.yaml.example`](config.yaml.example) for all options with inline documentation.
 
-| Section | What it controls |
-|---|---|
-| `project.name` | Label used in User-Agent string and logs |
-| `runner.workers` | Number of sites checked concurrently |
-| `runner.apiPort` | Dashboard API port (default `8080`, set to `0` to disable) |
-| `runner.logRetentionDays` | How long logs are kept in TimescaleDB (default `7`) |
-| `runner.resultsRetentionDays` | How long check results are kept (default `180`) |
-| `runner.lighthouseReportRetentionDays` | How long HTML/JSON report files are kept on disk (default `7`) |
-| `healthcheck` | Default intervals and timeouts for healthchecks |
-| `lighthouse` | Default intervals, throttling, and viewport for Lighthouse |
+| Setting | Default | What it controls |
+|---|---|---|
+| `project.name` | `healthcheck-wrangler` | Label used in User-Agent string and logs |
+| `runner.workers` | `3` | Max concurrent healthcheck tasks |
+| `runner.lighthouseWorkers` | `1` | Max concurrent Lighthouse audits (keep at 1 — parallel audits distort scores) |
+| `runner.workerMonitoring` | `true` | Record worker utilization history for the `/workers` dashboard |
+| `runner.pageDelayMs` | `0` | Milliseconds to wait between page requests within a site (overridable per site) |
+| `runner.apiPort` | `8080` | Dashboard API port (set to `0` to disable) |
+| `runner.logRetentionDays` | `7` | How long logs are kept in TimescaleDB |
+| `runner.resultsRetentionDays` | `180` | How long check and Lighthouse results are kept |
+| `runner.lighthouseReportRetentionDays` | `7` | How long HTML/JSON Lighthouse report files are kept on disk |
+| `healthcheck.defaultIntervalMinutes` | `10` | Check interval (overridable per site) |
+| `healthcheck.defaultTimeoutSeconds` | `30` | Page navigation timeout |
+| `lighthouse.defaultIntervalMinutes` | `360` | Audit interval (overridable per site) |
+| `lighthouse.defaultThrottling` | `mobile` | `mobile` (slow 3G simulation) or `desktop` |
 
 Database connection is read from the `DATABASE_URL` environment variable. If not set, the runner operates without persistence (in-memory only, no dashboard data).
 
@@ -170,13 +202,18 @@ Database connection is read from the `DATABASE_URL` environment variable. If not
 
 Built-in channel-based alerting fires on state transitions only — once when a site goes down, once when it recovers. No repeated notifications while a site stays down.
 
-Configure channels in `config.yaml`:
+### Defining channels
+
+Each channel is defined once in `config.yaml` with a unique `name`. The `defaults.channels` list controls which channels apply to all sites by default:
 
 ```yaml
 alerting:
+  defaults:
+    channels: [ops-chat]   # applied to every site unless overridden
+
   channels:
     - type: google-chat
-      name: Ops
+      name: ops-chat
       webhookUrl: "https://chat.googleapis.com/v1/spaces/..."
       on:
         - site-down
@@ -185,11 +222,125 @@ alerting:
         - memory-recovered
         - high-load        # load avg > 90% of CPU core count
         - load-recovered
+
+    - type: google-chat
+      name: critical-only
+      webhookUrl: "https://chat.googleapis.com/..."
+      on: [site-down]
 ```
 
-Multiple channels are supported. Each subscribes to its own `on` event list. Per-site opt-out: set `alerting: false` in the site YAML.
+If `defaults.channels` is omitted, all defined channels apply to all sites.
 
-Resource metrics (RAM, CPU load) are sampled every 60 seconds by the runner regardless of dashboard usage.
+### Per-site overrides
+
+Site YAMLs can adjust which channels they use without touching the global config:
+
+```yaml
+alerting: true              # use defaults (inherited by all sites, no override needed)
+alerting: false             # silence all alerts for this site
+alerting:
+  add: [critical-only]      # add a channel not in the default list
+alerting:
+  remove: [ops-chat]        # suppress a channel for this site
+alerting:
+  add: [critical-only]
+  remove: [ops-chat]        # swap channels entirely
+```
+
+### Event types
+
+| Event | Trigger |
+|---|---|
+| `site-down` | All pages were up; at least one is now down |
+| `site-recovery` | At least one page was down; all are up again |
+| `high-memory` | Host RAM crosses 85% |
+| `memory-recovered` | Host RAM drops below 70% |
+| `high-load` | 1-minute load avg crosses 90% of CPU core count |
+| `load-recovered` | Load drops below 60% of CPU core count |
+
+Resource metrics are sampled every 60 seconds regardless of dashboard usage.
+
+---
+
+## Annotations
+
+Annotations are timestamped notes that appear as vertical markers on time-series charts — useful for correlating deployments or config changes with performance trends.
+
+### Creating annotations from the dashboard
+
+Open any site's detail page, click **Add note** in the header, type a label, and optionally adjust the timestamp (defaults to now). The note appears immediately on the Timeline and Lighthouse charts for that site.
+
+Notes can be edited or deleted from the same panel.
+
+### Creating annotations from CI/CD
+
+The runner API accepts annotation POSTs, making it easy to mark deployments automatically:
+
+```bash
+curl -X POST http://runner:8080/api/annotations \
+  -H "Content-Type: application/json" \
+  -d '{"label": "Deploy v2.3.1", "site": "my-site"}'
+```
+
+Omit `site` to create a fleet-wide annotation visible on all charts. Pass `ts` (Unix milliseconds) to backdate an annotation:
+
+```bash
+curl -X POST http://runner:8080/api/annotations \
+  -H "Content-Type: application/json" \
+  -d '{"label": "Config rollback", "site": "my-site", "ts": 1715000000000}'
+```
+
+Update or delete existing annotations:
+
+```bash
+# Update
+curl -X PUT http://runner:8080/api/annotations/42 \
+  -H "Content-Type: application/json" \
+  -d '{"label": "Deploy v2.3.2 (hotfix)"}'
+
+# Delete
+curl -X DELETE http://runner:8080/api/annotations/42
+```
+
+### Where annotations appear
+
+- **Timeline tab** — vertical dashed line spanning all page rows, with a diamond marker and label
+- **Lighthouse tab** — vertical dashed line on the Scores and Core Web Vitals charts
+- **Overview tab** — vertical marker on the Pages up sparkline
+
+Annotations are filtered to the chart's visible time range client-side, so switching to a wider range (e.g. 7d) reveals older markers automatically.
+
+---
+
+## Worker monitoring
+
+The `/workers` dashboard page tracks how busy workers are over time and projects capacity requirements.
+
+### What it shows
+
+- **Utilization chart** — stacked area of active healthcheck + Lighthouse workers vs the configured max, sampled once per minute
+- **Queue depth** — tasks that were due but had to wait for a free worker slot
+- **Capacity forecast** — comparison table for N−1, current, and N+1 worker scenarios: throughput (tasks/hr), saturation %, average queue wait time, and estimated RAM impact
+- **Recommendations** — rule-based suggestions: whether to add a worker, reduce check intervals, or scale down
+
+### Interpreting the forecast
+
+Saturation is the ratio of scheduled task-hours to available worker-hours per hour. At 100% saturation, every scheduled task runs back-to-back with no idle time — tasks start queuing above this point.
+
+The RAM estimates are approximate: healthcheck workers are concurrent async tasks within a single Node.js process, not separate processes, so memory cannot be cleanly attributed per worker. Treat the figures as order-of-magnitude guidance.
+
+`os.totalmem()` reflects the container's memory limit on Docker with cgroup v2 (Docker ≥ 20.10). On older setups it may return host RAM instead.
+
+### Configuration
+
+```yaml
+runner:
+  workers: 3              # max concurrent tasks (healthcheck + lighthouse combined)
+  lighthouseWorkers: 1    # max concurrent Lighthouse audits (keep at 1 for accurate scores)
+  workerMonitoring: true  # set false to disable history recording (~1 DB write/minute)
+```
+
+Worker stats are retained for the same period as check results (`runner.resultsRetentionDays`, default 180 days).
 
 ---
 

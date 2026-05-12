@@ -2,54 +2,110 @@ project:
   name: my-healthchecks        # used in User-Agent string
 
 runner:
-  workers: 3                   # number of sites checked concurrently
-  pageDelayMs: 0               # ms to wait between page requests within a site (0 = disabled)
+  # How many sites can be healthchecked at the same time.
+  # Each worker opens its own headless browser. 3 is a safe default for a shared VM;
+  # raise it if the host has spare CPU and you have many sites to check quickly.
+  workers: 3
+
+  # Record worker utilization, queue depth, and task durations once per minute.
+  # Powers the /workers dashboard page with utilization trends and capacity forecasts.
+  # Disable to skip ~1 DB write per minute if storage is constrained.
+  workerMonitoring: true
+
+  # How many Lighthouse audits can run simultaneously.
+  # Default 1 — Lighthouse is CPU/RAM intensive and concurrent runs distort each
+  # other's performance scores (network throttling simulation, JavaScript execution
+  # timing). Only raise this if you have dedicated hardware and understand the
+  # trade-off: scores will be less accurate but audits finish sooner.
+  lighthouseWorkers: 1
+
+  # Milliseconds to wait between consecutive page requests within a single site.
+  # 0 disables the delay. Useful for sites on weak shared hosting that struggle
+  # with back-to-back headless browser hits. Can be overridden per site in its YAML.
+  pageDelayMs: 0
+
   sitesDir: ./sites            # directory containing site YAML files
   reportsDir: ./reports        # directory where Lighthouse HTML/JSON report files are saved
   logLevel: info               # trace | debug | info | warn | error | fatal
   schedulerTickMs: 1000        # how often the scheduler checks for due tasks (ms)
-  lighthouseStartDelayMs: 30000  # delay before the first Lighthouse run after startup (ms)
+
+  # Delay before the first Lighthouse audit fires after startup.
+  # Healthchecks start immediately; Lighthouse waits this long so the runner isn't
+  # hammering sites with heavy audits right as it comes online (e.g. after a restart).
+  lighthouseStartDelayMs: 30000
 
   # Dashboard API — set apiPort: 0 to disable
-  apiPort: 8080                # port for the runner's internal REST + SSE API
+  apiPort: 8080
 
-  # Retention (requires DATABASE_URL env var to be set)
-  logRetentionDays: 7          # log entries older than this are dropped automatically by TimescaleDB
-  resultsRetentionDays: 180    # healthcheck + lighthouse result history retention (6 months)
-  lighthouseReportRetentionDays: 7  # delete Lighthouse HTML/JSON report files from disk after N days
+  # Retention — how long data is kept in TimescaleDB (requires DATABASE_URL).
+  logRetentionDays: 7          # structured log entries (7 days is usually plenty for debugging)
+  resultsRetentionDays: 180    # healthcheck + Lighthouse result history (6 months)
+  lighthouseReportRetentionDays: 7  # HTML/JSON report files on disk (these are large; keep short)
 
 healthcheck:
-  defaultIntervalMinutes: 10   # how often to run healthchecks (per-site YAML can override)
-  defaultTimeoutSeconds: 30    # page navigation timeout
-  selectorTimeoutMs: 5000      # per-selector visibility check timeout
-  forceCloseTimeoutMs: 5000    # browser force-close timeout on error
+  # How often to run healthchecks. Per-site YAML can override with intervalMinutes.
+  defaultIntervalMinutes: 10
 
-lighthouse:
-  defaultIntervalMinutes: 360  # how often to run Lighthouse audits (6 hours)
-  defaultThrottling: mobile    # mobile | desktop
-  desktopWidth: 1350
-  desktopHeight: 940
+  # How long to wait for a page to fully load before marking it as failed.
+  # Increase for slow sites; decrease to fail fast and free up the worker sooner.
+  defaultTimeoutSeconds: 30
+
+  # How long to wait for a single CSS selector to become visible on the page.
+  # This is separate from the navigation timeout above — a page can load but still
+  # have elements that appear late via JavaScript.
+  selectorTimeoutMs: 5000
+
+  # If the browser hangs and doesn't respond to a graceful close, it is force-killed
+  # after this many milliseconds to free the worker slot.
   forceCloseTimeoutMs: 5000
 
+lighthouse:
+  # How often to run a full Lighthouse audit per site. 360 = every 6 hours.
+  # Lighthouse is slow (30–90s per page) and resource-heavy — running it too
+  # frequently on many sites will queue up audits faster than they can complete.
+  defaultIntervalMinutes: 360
+
+  # Throttling profile applied during audits.
+  # mobile — simulates a mid-tier Android phone on slow 3G. This is what Google
+  #          uses for PageSpeed Insights and is the most representative of real-world
+  #          conditions for most sites. Scores will be lower than desktop.
+  # desktop — uses a fast network and no CPU throttling. Use this for dashboards,
+  #           admin panels, or sites whose primary audience is desktop users.
+  defaultThrottling: mobile    # mobile | desktop
+
+  desktopWidth: 1350           # viewport width when throttling: desktop
+  desktopHeight: 940
+  forceCloseTimeoutMs: 5000    # same force-kill safety net as healthcheck
+
 watcher:
-  stabilityThreshold: 250      # ms a site YAML must be stable before reloading
-  pollInterval: 50             # chokidar poll interval (ms)
+  # How long a site YAML file must be unchanged before it is reloaded.
+  # Prevents a half-written file from being parsed mid-save.
+  stabilityThreshold: 250      # ms
+
+  pollInterval: 50             # chokidar filesystem poll interval (ms)
 
 alerting:
-  # Native channel-based alerting — fires on state transitions (up→down, down→up)
+  defaults:
+    # Channel names applied to every site by default.
+    # Omit this key entirely to apply ALL defined channels to all sites.
+    channels: [ops-chat]
+
+  # Define all alert channels here. Each must have a unique name.
+  # Channels are referenced by name in site YAMLs (alerting.add / alerting.remove).
   channels:
     - type: google-chat
-      name: Ops              # optional label for logs
+      name: ops-chat         # unique name — referenced in site YAML overrides
       webhookUrl: "https://chat.googleapis.com/v1/spaces/SPACE/messages?key=KEY&token=TOKEN"
-      on:                    # events to send — omit the list to receive all
+      on:                    # events this channel handles
         - site-down
         - site-recovery
         - high-memory        # RAM > 85%
         - memory-recovered
         - high-load          # CPU load > 90% of core count
         - load-recovered
-  # Uncomment to add more channels, e.g. a separate space for critical alerts only:
+
+  # Example: a second channel for critical alerts only (add to defaults.channels to use):
   # - type: google-chat
-  #   name: Critical
+  #   name: critical-ops
   #   webhookUrl: "https://chat.googleapis.com/..."
   #   on: [site-down]
