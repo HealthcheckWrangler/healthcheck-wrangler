@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.0.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v3.0.0...v4.0.0) (2026-05-13)
+
+### ⚠ BREAKING CHANGES
+
+* configurable startup scheduling to prevent thundering herd on fresh start
+
+### Features
+
+* configurable startup scheduling to prevent thundering herd on fresh start ([4adb6bd](https://github.com/HealthcheckWrangler/healthcheck-wrangler/commit/4adb6bd7f139c697526ca5973053372f24a4760a))
+
 ## [3.0.0](https://github.com/HealthcheckWrangler/healthcheck-wrangler/compare/v2.2.0...v3.0.0) (2026-05-12)
 
 ### ⚠ BREAKING CHANGES
