@@ -34,6 +34,28 @@ runner:
   # hammering sites with heavy audits right as it comes online (e.g. after a restart).
   lighthouseStartDelayMs: 30000
 
+  # How to spread site checks across the first interval on startup to avoid all sites
+  # queuing simultaneously (thundering herd). Four modes:
+  #
+  #   even    — sites divided into equal slots across the interval. Deterministic and
+  #             guaranteed to not cluster. Worst case: last site delayed by one full interval.
+  #             Example: 6 sites × 10 min → checks at 0:00, 1:40, 3:20, 5:00, 6:40, 8:20.
+  #
+  #   random  — each new task scheduled at a random point within its full interval.
+  #             Can still cluster by chance. Worst case same as even.
+  #
+  #   capped  — random jitter capped at startupJitterCapMs. All sites get their first
+  #             check within the cap, with reduced (but not eliminated) clustering risk.
+  #             Example: cap 2 min → all 6 sites checked within 2 min, then stay staggered.
+  #
+  #   none    — all tasks fire immediately (original behaviour, not recommended).
+  #
+  startupJitter: even
+
+  # Maximum jitter applied when startupJitter is "capped" (milliseconds).
+  # Has no effect when startupJitter is "full" or "none".
+  startupJitterCapMs: 120000   # 2 minutes
+
   # Dashboard API — set apiPort: 0 to disable
   apiPort: 8080
 

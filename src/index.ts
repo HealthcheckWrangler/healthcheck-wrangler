@@ -97,7 +97,10 @@ async function main(): Promise<void> {
         knownSites.delete(name);
       }
     }
-    scheduler.rebuild(sites, config.runner.lighthouseStartDelayMs);
+    scheduler.rebuild(sites, config.runner.lighthouseStartDelayMs, {
+      mode: config.runner.startupJitter,
+      capMs: config.runner.startupJitterCapMs,
+    });
     logger.info({ tasks: scheduler.taskList.length }, "scheduler rebuilt");
   };
 

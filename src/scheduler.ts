@@ -17,34 +17,63 @@ export class Scheduler {
   private stopping = false;
   private _paused = false;
 
-  rebuild(sites: import("./config.js").Site[], lighthouseStartDelayMs: number): void {
+  rebuild(
+    sites: import("./config.js").Site[],
+    lighthouseStartDelayMs: number,
+    jitter: { mode: "none" | "even" | "random" | "capped"; capMs: number },
+  ): void {
     const now = Date.now();
     const next: ScheduledTask[] = [];
+    const newTasks: ScheduledTask[] = [];
+
     for (const site of sites) {
       if (!site.enabled) continue;
       if (site.healthcheck.enabled) {
-        const existing = this._tasks.find(
-          (t) => t.type === "healthcheck" && t.site === site.name,
-        );
-        next.push({
-          type: "healthcheck",
-          site: site.name,
-          intervalMs: site.healthcheck.intervalMinutes * 60_000,
-          nextRun: existing?.nextRun ?? now,
-        });
+        const intervalMs = site.healthcheck.intervalMinutes * 60_000;
+        const existing = this._tasks.find((t) => t.type === "healthcheck" && t.site === site.name);
+        const task: ScheduledTask = { type: "healthcheck", site: site.name, intervalMs, nextRun: 0 };
+        if (existing) { task.nextRun = existing.nextRun; } else { newTasks.push(task); }
+        next.push(task);
       }
       if (site.lighthouse.enabled) {
-        const existing = this._tasks.find(
-          (t) => t.type === "lighthouse" && t.site === site.name,
-        );
-        next.push({
-          type: "lighthouse",
-          site: site.name,
-          intervalMs: site.lighthouse.intervalMinutes * 60_000,
-          nextRun: existing?.nextRun ?? now + lighthouseStartDelayMs,
-        });
+        const intervalMs = site.lighthouse.intervalMinutes * 60_000;
+        const existing = this._tasks.find((t) => t.type === "lighthouse" && t.site === site.name);
+        const task: ScheduledTask = { type: "lighthouse", site: site.name, intervalMs, nextRun: 0 };
+        if (existing) { task.nextRun = existing.nextRun; } else { newTasks.push(task); }
+        next.push(task);
       }
     }
+
+    // Apply startup scheduling to new tasks only
+    if (jitter.mode === "even") {
+      // Group by type+interval so each cohort is distributed independently
+      const groups = new Map<string, ScheduledTask[]>();
+      for (const task of newTasks) {
+        const key = `${task.type}:${task.intervalMs}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(task);
+      }
+      for (const group of groups.values()) {
+        const base = group[0]!.type === "lighthouse" ? lighthouseStartDelayMs : 0;
+        const intervalMs = group[0]!.intervalMs;
+        group.forEach((task, i) => {
+          task.nextRun = now + base + Math.floor((i / group.length) * intervalMs);
+        });
+      }
+    } else {
+      for (const task of newTasks) {
+        const base = task.type === "lighthouse" ? lighthouseStartDelayMs : 0;
+        if (jitter.mode === "none") {
+          task.nextRun = now + base;
+        } else {
+          const max = jitter.mode === "capped"
+            ? Math.min(jitter.capMs, task.intervalMs)
+            : task.intervalMs;
+          task.nextRun = now + base + Math.floor(Math.random() * max);
+        }
+      }
+    }
+
     this._tasks = next;
   }
 

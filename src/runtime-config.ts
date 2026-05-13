@@ -20,6 +20,8 @@ const RunnerSchema = z
     logLevel: z.string().default("info"),
     schedulerTickMs: z.number().int().positive().default(1000),
     lighthouseStartDelayMs: z.number().int().min(0).default(30_000),
+    startupJitter: z.enum(["none", "even", "random", "capped"]).default("even"),
+    startupJitterCapMs: z.number().int().min(0).default(120_000),
     // Dashboard API — always on by default (set to 0 to disable)
     apiPort: z.number().int().min(0).default(8080),
     logRetentionDays: z.number().int().positive().default(7),
