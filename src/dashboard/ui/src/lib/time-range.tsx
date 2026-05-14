@@ -6,7 +6,7 @@ export interface TimeRange {
   label: string;
 }
 
-const PRESETS: { label: string; ms: number }[] = [
+export const PRESETS: { label: string; ms: number }[] = [
   { label: "1h",  ms: 3_600_000 },
   { label: "6h",  ms: 6 * 3_600_000 },
   { label: "24h", ms: 24 * 3_600_000 },
@@ -14,10 +14,17 @@ const PRESETS: { label: string; ms: number }[] = [
   { label: "30d", ms: 30 * 86_400_000 },
 ];
 
+export const WORKER_PRESETS: { label: string; ms: number }[] = [
+  { label: "1h",  ms: 3_600_000 },
+  { label: "6h",  ms: 6 * 3_600_000 },
+  { label: "24h", ms: 24 * 3_600_000 },
+  { label: "3d",  ms: 3 * 86_400_000 },
+];
+
 interface TimeRangeCtx {
   range: TimeRange;
   activePreset: string | null;
-  setPreset: (label: string) => void;
+  setPreset: (label: string, ms: number) => void;
   setCustom: (startMs: number, endMs: number) => void;
   presets: typeof PRESETS;
 }
@@ -31,11 +38,9 @@ export function TimeRangeProvider({ children }: { children: ReactNode }) {
   });
   const [activePreset, setActivePreset] = useState<string | null>("24h");
 
-  const setPreset = useCallback((label: string) => {
-    const preset = PRESETS.find((p) => p.label === label);
-    if (!preset) return;
+  const setPreset = useCallback((label: string, ms: number) => {
     const now = Date.now();
-    setRange({ startMs: now - preset.ms, endMs: now, label });
+    setRange({ startMs: now - ms, endMs: now, label });
     setActivePreset(label);
   }, []);
 

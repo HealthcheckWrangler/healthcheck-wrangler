@@ -29,12 +29,31 @@ export async function insertWorkerStat(
   `;
 }
 
-function bucketInterval(startMs: number, endMs: number): string {
-  const rangeMs = endMs - startMs;
-  if (rangeMs <= 6 * 3_600_000) return "5 minutes";
-  if (rangeMs <= 48 * 3_600_000) return "10 minutes";
-  if (rangeMs <= 7 * 86_400_000) return "1 hour";
-  return "6 hours";
+export interface WorkerStatsSummary {
+  peakActive: number;
+  queueEvents: number;
+  sampleCount: number;
+}
+
+export async function getWorkerStatsSummary(
+  sql: postgres.Sql,
+  startMs: number,
+  endMs: number,
+): Promise<WorkerStatsSummary> {
+  const rows = await sql<{ peak_active: number; queue_events: number; sample_count: number }[]>`
+    SELECT
+      COALESCE(MAX(active_total), 0)          AS peak_active,
+      COUNT(*) FILTER (WHERE queue_depth > 0) AS queue_events,
+      COUNT(*)                                AS sample_count
+    FROM worker_stats
+    WHERE ts BETWEEN ${new Date(startMs)} AND ${new Date(endMs)}
+  `;
+  const row = rows[0];
+  return {
+    peakActive:  Number(row?.peak_active  ?? 0),
+    queueEvents: Number(row?.queue_events ?? 0),
+    sampleCount: Number(row?.sample_count ?? 0),
+  };
 }
 
 export async function getWorkerStats(
@@ -42,19 +61,17 @@ export async function getWorkerStats(
   startMs: number,
   endMs: number,
 ): Promise<WorkerStatPoint[]> {
-  const interval = bucketInterval(startMs, endMs);
   const rows = await sql<WorkerStatPoint[]>`
     SELECT
-      time_bucket(${interval}::interval, ts)   AS ts,
-      AVG(utilization_pct)::float              AS util_pct,
-      AVG(queue_depth)::float                  AS queue_depth,
-      AVG(active_lh)::float                    AS active_lh,
-      AVG(active_hc)::float                    AS active_hc,
-      MAX(max_workers)                         AS max_workers
+      ts,
+      utilization_pct  AS util_pct,
+      queue_depth,
+      active_lh,
+      active_hc,
+      max_workers
     FROM worker_stats
     WHERE ts BETWEEN ${new Date(startMs)} AND ${new Date(endMs)}
-    GROUP BY 1
-    ORDER BY 1 ASC
+    ORDER BY ts ASC
   `;
   return rows;
 }

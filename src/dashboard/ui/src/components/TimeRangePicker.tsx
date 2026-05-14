@@ -3,8 +3,14 @@ import { CalendarDays } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTimeRange } from "../lib/time-range";
 
-export function TimeRangePicker() {
-  const { presets, activePreset, setPreset, setCustom } = useTimeRange();
+interface TimeRangePickerProps {
+  presets?: { label: string; ms: number }[];
+  allowCustom?: boolean;
+}
+
+export function TimeRangePicker({ presets: presetsProp, allowCustom = true }: TimeRangePickerProps) {
+  const { presets: ctxPresets, activePreset, setPreset, setCustom } = useTimeRange();
+  const presets = presetsProp ?? ctxPresets;
   const [showCustom, setShowCustom] = useState(false);
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -23,7 +29,7 @@ export function TimeRangePicker() {
       {presets.map((p) => (
         <button
           key={p.label}
-          onClick={() => setPreset(p.label)}
+          onClick={() => setPreset(p.label, p.ms)}
           className={cn(
             "rounded px-2.5 py-1 text-xs font-medium transition-colors",
             activePreset === p.label
@@ -35,18 +41,20 @@ export function TimeRangePicker() {
         </button>
       ))}
 
-      <button
-        onClick={() => setShowCustom((v) => !v)}
-        className={cn(
-          "flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors",
-          showCustom || activePreset === null
-            ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
-            : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
-        )}
-      >
-        <CalendarDays className="h-3.5 w-3.5" />
-        Custom
-      </button>
+      {allowCustom && (
+        <button
+          onClick={() => setShowCustom((v) => !v)}
+          className={cn(
+            "flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors",
+            showCustom || activePreset === null
+              ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+              : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
+          )}
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+          Custom
+        </button>
+      )}
 
       {showCustom && (
         <div className="absolute right-0 top-8 z-50 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-xl w-72">

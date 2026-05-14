@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Legend,
 } from "recharts";
 import { AlertTriangle, CheckCircle, Info, XCircle } from "lucide-react";
@@ -75,13 +75,29 @@ function ForecastTable({ forecast }: { forecast: WorkerForecast }) {
         </span>
       </div>
 
+      {forecast.historySampleCount >= 30 && (
+        <div className="mb-3 flex items-center gap-4 rounded-lg bg-[hsl(var(--muted)/0.4)] px-3 py-2 text-[11px] text-[hsl(var(--muted-foreground))]">
+          <span>
+            <span className="font-medium text-[hsl(var(--foreground))]">Peak observed:</span>{" "}
+            {forecast.peakActive}/{forecast.maxWorkers} workers · last 3 days
+          </span>
+          <span>
+            <span className="font-medium text-[hsl(var(--foreground))]">Queue events:</span>{" "}
+            {forecast.queueEvents === 0
+              ? <span className="text-[hsl(var(--success))]">none</span>
+              : <span className="text-[hsl(var(--destructive))]">{forecast.queueEvents}</span>
+            }
+          </span>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[hsl(var(--border))] text-left text-xs text-[hsl(var(--muted-foreground))]">
               <th className="pb-2 pr-4">Scenario</th>
               <th className="pb-2 pr-4 text-right">Capacity</th>
-              <th className="pb-2 pr-4 text-right">Saturation</th>
+              <th className="pb-2 pr-4 text-right">Saturation <span className="font-normal opacity-60">(theoretical)</span></th>
               <th className="pb-2 pr-4 text-right">Avg queue wait</th>
               <th className="pb-2 text-right">Est. process RAM</th>
             </tr>
@@ -131,13 +147,13 @@ function ForecastTable({ forecast }: { forecast: WorkerForecast }) {
         </table>
       </div>
 
-      {forecast.sampleCount < 20 && (
-        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">
-          <Info className="h-3 w-3 shrink-0" />
-          Estimates improve as more tasks complete — {forecast.sampleCount}/20 samples collected.
-          {" "}RAM figures are approximate: workers share one process, not separate memory spaces.
-        </div>
-      )}
+      <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">
+        <Info className="h-3 w-3 shrink-0" />
+        {forecast.sampleCount < 20
+          ? `Estimates improve as more tasks complete — ${forecast.sampleCount}/20 samples collected. `
+          : ""}
+        Saturation % is a steady-state model — actual usage is spiky for polling systems. Use the Peak Observed row above as the primary sizing signal. RAM figures are approximate.
+      </div>
     </div>
   );
 }
@@ -164,9 +180,87 @@ function UtilizationChart({ points, maxWorkers }: { points: WorkerStatPoint[]; m
           />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <ReferenceLine y={maxWorkers} stroke="hsl(var(--primary))" strokeDasharray="5 3" strokeOpacity={0.6} label={{ value: "max workers", position: "insideTopRight", fontSize: 9, fill: "hsl(var(--primary))" }} />
-          <Area type="stepAfter" dataKey="activeHc" name="Healthcheck" stackId="1" stroke="hsl(217 91% 60%)" fill="hsl(217 91% 60%)" fillOpacity={0.6} dot={showDots} animationDuration={400} />
-          <Area type="stepAfter" dataKey="activeLh"  name="Lighthouse"  stackId="1" stroke="hsl(32 95% 54%)"  fill="hsl(32 95% 54%)"  fillOpacity={0.6} dot={showDots} animationDuration={400} />
+          <Area type="linear" dataKey="activeHc" name="Healthcheck" stackId="1" stroke="hsl(217 91% 60%)" fill="hsl(217 91% 60%)" fillOpacity={0.6} dot={showDots} animationDuration={400} />
+          <Area type="linear" dataKey="activeLh"  name="Lighthouse"  stackId="1" stroke="hsl(32 95% 54%)"  fill="hsl(32 95% 54%)"  fillOpacity={0.6} dot={showDots} animationDuration={400} />
         </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function bucketSaturation(points: WorkerStatPoint[], bucketCount = 24) {
+  if (points.length < 2) return [];
+  const minTs = points[0].ts;
+  const maxTs = points[points.length - 1].ts;
+  const bucketMs = (maxTs - minTs) / bucketCount;
+  if (bucketMs <= 0) return [];
+
+  const buckets = Array.from({ length: bucketCount }, (_, i) => ({
+    ts:    minTs + i * bucketMs,
+    endTs: minTs + (i + 1) * bucketMs,
+    saturated: 0,
+    partial: 0,
+    idle: 0,
+  }));
+
+  for (const p of points) {
+    const idx = Math.min(Math.floor((p.ts - minTs) / bucketMs), bucketCount - 1);
+    const active = p.activeHc + p.activeLh;
+    if (active >= p.maxWorkers) buckets[idx].saturated++;
+    else if (active === 0) buckets[idx].idle++;
+    else buckets[idx].partial++;
+  }
+
+  return buckets.filter((b) => b.saturated + b.partial + b.idle > 0);
+}
+
+function SaturationChart({ points, rangeLabel }: { points: WorkerStatPoint[]; rangeLabel: string }) {
+  const totalSamples = points.length;
+  const atCapacity = points.filter((p) => p.activeHc + p.activeLh >= p.maxWorkers).length;
+  const idle       = points.filter((p) => p.activeHc + p.activeLh === 0).length;
+  const partial    = totalSamples - atCapacity - idle;
+  const buckets    = useMemo(() => bucketSaturation(points), [points]);
+
+  const pct = (n: number) => totalSamples > 0 ? Math.round((n / totalSamples) * 100) : 0;
+
+  return (
+    <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+      <div className="mb-4 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-xs text-[hsl(var(--muted-foreground))]">
+            Times at full capacity · last {rangeLabel}
+          </div>
+          <div className="mt-0.5 text-4xl font-bold tabular-nums">{atCapacity}</div>
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-[hsl(var(--muted-foreground))] flex-wrap">
+            <span><span className="font-medium text-[hsl(var(--destructive))]">{atCapacity} min</span> at full capacity ({pct(atCapacity)}%)</span>
+            <span className="opacity-40">·</span>
+            <span><span className="font-medium text-[hsl(217_91%_60%)]">{partial} min</span> partial ({pct(partial)}%)</span>
+            <span className="opacity-40">·</span>
+            <span><span className="font-medium text-[hsl(var(--foreground))]">{idle} min</span> idle ({pct(idle)}%)</span>
+          </div>
+        </div>
+        <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+          Idle (gray) · Partial (blue) · At capacity (red) · per time slot
+        </span>
+      </div>
+      <ResponsiveContainer width="100%" height={160}>
+        <BarChart data={buckets} margin={{ top: 4, right: 8, bottom: 4, left: 0 }} barCategoryGap="15%">
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+          <XAxis dataKey="ts" tickFormatter={fmtAxisDate} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} minTickGap={60} />
+          <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={24} allowDecimals={false} />
+          <Tooltip
+            contentStyle={TOOLTIP_STYLE}
+            labelFormatter={(v, payload) => {
+              const endTs = (payload?.[0]?.payload as { endTs?: number })?.endTs;
+              const fmt = (ms: number) => new Date(ms).toLocaleTimeString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+              return endTs ? `${fmt(v as number)} – ${fmt(endTs)}` : new Date(v as number).toLocaleString();
+            }}
+            formatter={(v, name) => [`${v} min`, String(name)]}
+          />
+          <Bar dataKey="idle"      name="Idle"        stackId="a" fill="hsl(var(--muted-foreground))" fillOpacity={0.35} />
+          <Bar dataKey="partial"   name="Partial"     stackId="a" fill="hsl(217 91% 60%)" fillOpacity={0.7} />
+          <Bar dataKey="saturated" name="At capacity" stackId="a" fill="hsl(var(--destructive))" fillOpacity={0.85} />
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
@@ -214,7 +308,7 @@ export function WorkersDashboard() {
 
   useEffect(() => {
     if (range.endMs - range.startMs > MAX_WORKER_MS) {
-      setPreset(WORKER_PRESETS[2].label); // "24h"
+      setPreset(WORKER_PRESETS[2].label, WORKER_PRESETS[2].ms); // "24h"
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -279,6 +373,7 @@ export function WorkersDashboard() {
       {points.length > 0 ? (
         <>
           <UtilizationChart points={points} maxWorkers={forecast?.maxWorkers ?? (status?.workers.max ?? 3)} />
+          <SaturationChart points={points} rangeLabel={range.label} />
           <QueueDepthChart points={points} />
         </>
       ) : (
