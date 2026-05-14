@@ -4,6 +4,7 @@ import { ChevronUp, Cpu, LayoutDashboard, Menu, Moon, Pause, Play, ScrollText, S
 import { cn } from "../lib/utils";
 import { api, type RunnerStatus, type TaskStatus, type Site } from "../api";
 import { TimeRangePicker } from "./TimeRangePicker";
+import { WORKER_PRESETS } from "../lib/time-range";
 import { useTheme } from "../lib/theme";
 
 interface LayoutProps {
@@ -74,8 +75,11 @@ export function Layout({ children, status, sites }: LayoutProps) {
               </div>
               {sites.map((site) => {
                 const isActive = location.pathname === `/sites/${site.name}`;
-                const latestHc = site.latestHealthcheck;
-                const isUp = latestHc?.up;
+                const hcResults = Object.values(site.pageLatest)
+                  .map((pl) => pl.healthcheck)
+                  .filter((hc): hc is import("../api").HealthcheckResult => hc != null);
+                const latestHc = hcResults[0] ?? null;
+                const isUp = hcResults.length > 0 && hcResults.every((hc) => hc.up);
                 return (
                   <NavLink
                     key={site.name}
@@ -158,7 +162,10 @@ export function Layout({ children, status, sites }: LayoutProps) {
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
-            <TimeRangePicker />
+            {location.pathname === "/workers"
+              ? <TimeRangePicker presets={WORKER_PRESETS} allowCustom={false} />
+              : <TimeRangePicker />
+            }
           </div>
         </div>
         {isPaused && <PausedTicker />}

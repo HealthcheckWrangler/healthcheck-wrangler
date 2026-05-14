@@ -82,7 +82,7 @@ function ScoresChart({ points, annotations }: { points: ChartPoint[]; annotation
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis dataKey="ts" tickFormatter={fmtAxisDate} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} minTickGap={60} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={28} />
-          <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => new Date(v as number).toLocaleString()} formatter={(v: number, name: string) => [`${Math.round(v)}`, name]} />
+          <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => new Date(v as number).toLocaleString()} formatter={(v, name) => [`${Math.round(v as number)}`, String(name)]} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <ReferenceLine y={90} stroke="hsl(var(--success))" strokeDasharray="4 4" strokeOpacity={0.4} />
           <ReferenceLine y={50} stroke="hsl(var(--warning))"  strokeDasharray="4 4" strokeOpacity={0.4} />
@@ -123,7 +123,7 @@ function VitalsChart({ points, annotations }: { points: ChartPoint[]; annotation
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             labelFormatter={(v) => new Date(v as number).toLocaleString()}
-            formatter={(v: number, name: string) => name === "CLS" ? [v.toFixed(3), name] : [`${v.toFixed(2)}s`, name]}
+            formatter={(v, name) => String(name) === "CLS" ? [(v as number).toFixed(3), String(name)] : [`${(v as number).toFixed(2)}s`, String(name)]}
           />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <ReferenceLine yAxisId="left"  y={2.5} stroke={VITAL_COLORS.lcp}  strokeDasharray="4 4" strokeOpacity={0.35} label={{ value: "LCP 2.5s",  position: "insideTopRight", fontSize: 9, fill: VITAL_COLORS.lcp  }} />

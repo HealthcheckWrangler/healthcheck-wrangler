@@ -196,7 +196,7 @@ export function Overview() {
 
               {/* Lighthouse scores (if available) */}
               {(() => {
-                const latestLh = site.pages.map((p) =>
+                const latestLh = site.pages.map((_) =>
                   (site as unknown as { latestLighthouse?: import("../api").LighthouseResult }).latestLighthouse
                 ).find(Boolean);
                 if (!latestLh) return null;

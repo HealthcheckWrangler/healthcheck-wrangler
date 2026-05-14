@@ -1,4 +1,5 @@
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
+import type { HealthcheckResult } from "../api";
 
 interface SparkLineProps {
   data: HealthcheckResult[];

@@ -5,8 +5,7 @@ import {
 } from "recharts";
 import { AlertTriangle, CheckCircle, Info, XCircle } from "lucide-react";
 import { api, type WorkerStatPoint, type WorkerForecast, type WorkerScenario, type RunnerStatus } from "../api";
-import { useTimeRange } from "../lib/time-range";
-import { TimeRangePicker } from "../components/TimeRangePicker";
+import { useTimeRange, WORKER_PRESETS } from "../lib/time-range";
 import { cn } from "../lib/utils";
 
 const TOOLTIP_STYLE = {
@@ -122,7 +121,7 @@ function ForecastTable({ forecast }: { forecast: WorkerForecast }) {
                       </span>
                     )}
                     {s.projectedMemPct > 85 && (
-                      <AlertTriangle className="ml-1 inline h-3 w-3 text-[hsl(var(--warning))]" title="Container RAM may be strained" />
+                      <AlertTriangle className="ml-1 inline h-3 w-3 text-[hsl(var(--warning))]" aria-label="Container RAM may be strained" />
                     )}
                   </td>
                 </tr>
@@ -157,16 +156,16 @@ function UtilizationChart({ points, maxWorkers }: { points: WorkerStatPoint[]; m
         <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis dataKey="ts" tickFormatter={fmtAxisDate} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} minTickGap={60} type="number" domain={["dataMin", "dataMax"]} scale="time" />
-          <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={24} domain={[0, Math.max(maxWorkers + 1, 4)]} />
+          <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={24} domain={[0, Math.max(maxWorkers + 1, 4)]} allowDecimals={false} />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
             labelFormatter={(v) => new Date(v as number).toLocaleString()}
-            formatter={(v: number, name: string) => [v.toFixed(1), name]}
+            formatter={(v, name) => [Math.round(v as number), String(name)]}
           />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <ReferenceLine y={maxWorkers} stroke="hsl(var(--primary))" strokeDasharray="5 3" strokeOpacity={0.6} label={{ value: "max workers", position: "insideTopRight", fontSize: 9, fill: "hsl(var(--primary))" }} />
-          <Area type="monotone" dataKey="activeHc" name="Healthcheck" stackId="1" stroke="hsl(217 91% 60%)" fill="hsl(217 91% 60%)" fillOpacity={0.6} dot={showDots} animationDuration={400} />
-          <Area type="monotone" dataKey="activeLh"  name="Lighthouse"  stackId="1" stroke="hsl(32 95% 54%)"  fill="hsl(32 95% 54%)"  fillOpacity={0.6} dot={showDots} animationDuration={400} />
+          <Area type="stepAfter" dataKey="activeHc" name="Healthcheck" stackId="1" stroke="hsl(217 91% 60%)" fill="hsl(217 91% 60%)" fillOpacity={0.6} dot={showDots} animationDuration={400} />
+          <Area type="stepAfter" dataKey="activeLh"  name="Lighthouse"  stackId="1" stroke="hsl(32 95% 54%)"  fill="hsl(32 95% 54%)"  fillOpacity={0.6} dot={showDots} animationDuration={400} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -195,7 +194,7 @@ function QueueDepthChart({ points }: { points: WorkerStatPoint[] }) {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="ts" tickFormatter={fmtAxisDate} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} minTickGap={60} type="number" domain={["dataMin", "dataMax"]} scale="time" />
             <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} width={24} allowDecimals={false} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => new Date(v as number).toLocaleString()} formatter={(v: number) => [v.toFixed(0), "queued tasks"]} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => new Date(v as number).toLocaleString()} formatter={(v) => [(v as number).toFixed(0), "queued tasks"]} />
             <Area type="monotone" dataKey="queueDepth" name="Queue depth" stroke="hsl(var(--destructive))" fill="hsl(var(--destructive))" fillOpacity={0.3} dot={showDots} animationDuration={400} />
           </AreaChart>
         </ResponsiveContainer>
@@ -204,12 +203,20 @@ function QueueDepthChart({ points }: { points: WorkerStatPoint[] }) {
   );
 }
 
+const MAX_WORKER_MS = 3 * 86_400_000;
+
 export function WorkersDashboard() {
-  const { range, activePreset, setPreset, presets } = useTimeRange();
+  const { range, setPreset } = useTimeRange();
   const [points, setPoints] = useState<WorkerStatPoint[]>([]);
   const [forecast, setForecast] = useState<WorkerForecast | null>(null);
   const [status, setStatus] = useState<RunnerStatus | null>(null);
   const [disabled, setDisabled] = useState(false);
+
+  useEffect(() => {
+    if (range.endMs - range.startMs > MAX_WORKER_MS) {
+      setPreset(WORKER_PRESETS[2].label); // "24h"
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     api.status().then(setStatus).catch(() => {});
@@ -247,10 +254,7 @@ export function WorkersDashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-xl font-semibold">Workers</h1>
-        <TimeRangePicker activePreset={activePreset} presets={presets} onSelect={setPreset} />
-      </div>
+      <h1 className="text-xl font-semibold">Workers</h1>
 
       {/* Live KPI row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
