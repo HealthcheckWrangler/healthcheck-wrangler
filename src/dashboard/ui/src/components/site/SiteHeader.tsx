@@ -110,7 +110,7 @@ export function SiteHeader({
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-semibold">{site.name}</h1>
+            <h1 className="text-xl font-semibold">{site.displayName ?? site.name}</h1>
             {!site.enabled && (
               <span className="rounded bg-[hsl(var(--muted))] px-2 py-0.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
                 Disabled

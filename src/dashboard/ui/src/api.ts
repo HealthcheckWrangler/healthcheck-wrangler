@@ -71,6 +71,7 @@ export interface LighthouseResult {
 export interface Site {
   name: string;
   baseUrl: string;
+  displayName?: string;
   enabled: boolean;
   alerting: boolean | { add: string[]; remove: string[] };
   healthcheck: { enabled: boolean; intervalMinutes: number; timeoutSeconds: number };

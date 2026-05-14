@@ -115,7 +115,7 @@ export function Overview() {
               <div className="flex items-start justify-between gap-2 p-4 pb-3">
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold text-[hsl(var(--foreground))] group-hover:text-[hsl(var(--primary))]">
-                    {site.name}
+                    {site.displayName ?? site.name}
                   </h2>
                   <a
                     href={site.baseUrl}

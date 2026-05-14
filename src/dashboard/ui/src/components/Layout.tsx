@@ -100,7 +100,7 @@ export function Layout({ children, status, sites }: LayoutProps) {
                               : "bg-[hsl(var(--destructive))]",
                       )}
                     />
-                    <span className="truncate">{site.name}</span>
+                    <span className="truncate">{site.displayName ?? site.name}</span>
                   </NavLink>
                 );
               })}

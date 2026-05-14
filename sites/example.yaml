@@ -5,6 +5,10 @@ name: example-site
 # Root URL of the site. All page paths below are resolved relative to this.
 baseUrl: https://example.com
 
+# Optional human-friendly label shown in the sidebar, overview cards, and site header.
+# If omitted, the name field is used. Unlike name, this can contain spaces and any characters.
+# displayName: My Site
+
 # Master switch. Set to true once selectors are validated and you're ready to monitor.
 enabled: false
 

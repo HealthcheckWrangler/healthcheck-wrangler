@@ -81,6 +81,7 @@ function createSiteSchema(config: RuntimeConfig) {
       .min(1)
       .regex(/^[a-z0-9][a-z0-9_-]*$/, "name must be kebab/snake-case lowercase"),
     baseUrl: z.string().url(),
+    displayName: z.string().optional(),
     enabled: z.boolean().default(true),
     alerting: SiteAlertingSchema,
     pageDelayMs: z.number().int().min(0).optional(),
