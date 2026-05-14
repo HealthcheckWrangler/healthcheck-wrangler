@@ -12,15 +12,28 @@ Playwright-based site monitoring with Lighthouse audits, a built-in status dashb
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/site-overview.png" alt="Site detail — KPI trend sparklines and Lighthouse scores" width="900">
-  <br><em>Site detail · availability sparklines · latest Lighthouse score rings and Core Web Vitals</em>
+  <img src="docs/screenshots/site-overview.png" alt="Site detail — uptime KPIs, availability sparklines, and Lighthouse scores" width="900">
+  <br><em>Site detail · 24h/7d/30d uptime % · availability sparklines · Lighthouse score averages and Core Web Vitals</em>
 </p>
 
 <table align="center"><tr>
 <td><img src="docs/screenshots/site-lighthouse.png" alt="Lighthouse history charts" width="440"></td>
-<td><img src="docs/screenshots/logs.png" alt="Log viewer" width="440"></td>
+<td><img src="docs/screenshots/site-annotations.png" alt="Annotation panel — add timestamped notes to charts" width="440"></td>
 </tr><tr>
 <td align="center"><em>Lighthouse score and Core Web Vitals history</em></td>
+<td align="center"><em>Annotation panel — timestamped notes shown as markers on charts</em></td>
+</tr></table>
+
+<p align="center">
+  <img src="docs/screenshots/workers-dashboard.png" alt="Worker monitoring — utilization history and capacity forecast" width="900">
+  <br><em>Worker monitoring · utilization history · queue depth · capacity forecast with +1/−1 worker scenarios</em>
+</p>
+
+<table align="center"><tr>
+<td><img src="docs/screenshots/site-timeline.png" alt="Page availability timeline" width="440"></td>
+<td><img src="docs/screenshots/logs.png" alt="Log viewer" width="440"></td>
+</tr><tr>
+<td align="center"><em>Page availability timeline with annotation markers</em></td>
 <td align="center"><em>Live log stream with level filter and full-text search</em></td>
 </tr></table>
 

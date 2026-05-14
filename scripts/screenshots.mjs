@@ -53,12 +53,24 @@ async function main() {
   await dp.waitForTimeout(400);
   await shot(dp, "site-pages");
 
+  // Annotation panel — go back to overview tab and open the Add note panel
+  await dp.locator("button", { hasText: "overview" }).click();
+  await dp.waitForTimeout(300);
+  await dp.locator("button", { hasText: /add note|notes/i }).click();
+  await dp.waitForTimeout(300);
+  await shot(dp, "site-annotations");
+
   // Logs page — SSE keeps connection open so networkidle never fires
   await dp.goto(`${BASE}/logs`, { waitUntil: "load" });
   await dp.waitForTimeout(600);
   await shot(dp, "logs");
 
-  // Worker panel — expand footer
+  // Workers dashboard page
+  await dp.goto(`${BASE}/workers`, { waitUntil: "networkidle" });
+  await dp.waitForTimeout(800);
+  await shot(dp, "workers-dashboard");
+
+  // Sidebar worker panel — expand footer on overview
   await dp.goto(`${BASE}/`, { waitUntil: "load" });
   await dp.locator("aside button", { hasText: "workers" }).click();
   await dp.waitForTimeout(300);
