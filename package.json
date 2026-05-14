@@ -22,6 +22,9 @@
     "build": "tsc -p tsconfig.json",
     "build:ui": "vite build --config src/dashboard/ui/vite.config.ts",
     "build:all": "npm run build && npm run build:ui",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "start": "node --enable-source-maps dist/src/index.js",
     "start:dashboard": "node --enable-source-maps dist/src/dashboard/server.js",
     "dev": "tsx watch src/index.ts",
@@ -84,6 +87,8 @@
     "tailwindcss": "^4.2.4",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitepress": "^1.6.4",
+    "vitepress-mermaid-renderer": "^1.1.24"
   }
 }
