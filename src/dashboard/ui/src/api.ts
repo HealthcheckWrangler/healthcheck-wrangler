@@ -186,6 +186,9 @@ export interface WorkerForecast {
   currentQueueDepth: number;
   tasksPerHour: number;
   maxWorkers: number;
+  peakActive: number;
+  queueEvents: number;
+  historySampleCount: number;
 }
 
 export interface UptimeStats {

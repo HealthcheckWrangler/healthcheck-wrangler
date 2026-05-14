@@ -14,7 +14,7 @@ import {
 } from "./db/healthchecks.js";
 import { getLighthouseHistoryForRange } from "./db/lighthouse.js";
 import { insertAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from "./db/annotations.js";
-import { getWorkerStats } from "./db/worker-stats.js";
+import { getWorkerStats, getWorkerStatsSummary } from "./db/worker-stats.js";
 
 interface ApiDeps {
   scheduler: Scheduler;
@@ -468,12 +468,23 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): 
     const plus1   = scenarioFor(maxWorkers + 1);
     const minus1  = maxWorkers > 1 ? scenarioFor(maxWorkers - 1) : null;
 
+    // Query last 3 days of history for observed peak and queue events
+    const historyStart = Date.now() - 3 * 86_400_000;
+    const history = deps.sql
+      ? await getWorkerStatsSummary(deps.sql, historyStart, Date.now())
+      : { peakActive: 0, queueEvents: 0, sampleCount: 0 };
+
     const recommendations: string[] = [];
+    const hasHistory = history.sampleCount >= 30; // at least 30 minutes of data
+
+    // Live queue check (immediate problem)
     if (deps.scheduler.queueDepth > 0) {
-      recommendations.push("Tasks are currently queued — workers cannot keep up with demand right now.");
+      recommendations.push(`Tasks are currently queued — workers cannot keep up with demand right now.`);
     }
-    if (current.satPct > 90) {
-      recommendations.push("Workers are near or over capacity. Consider adding a worker (`runner.workers`).");
+
+    // Historical queue events (sustained problem)
+    if (history.queueEvents > 0) {
+      recommendations.push(`Queue backed up ${history.queueEvents} time${history.queueEvents !== 1 ? "s" : ""} in the last 3 days — workers may be undersized. Consider adding a worker (\`runner.workers\`).`);
       if (plus1.projectedMemPct > 85) {
         recommendations.push("Adding a worker may push container RAM above 85%. Consider increasing Docker memory allocation first.");
       }
@@ -482,12 +493,15 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): 
         : 0;
       if (avgIntervalMin > 0 && avgIntervalMin < 30) {
         const suggested = Math.round(avgIntervalMin * (tasksPerHour / (requiredCapacity * 0.75)));
-        recommendations.push(`Alternatively, increasing check intervals (currently avg ${avgIntervalMin}m) to ~${suggested}m would reduce load to ~75% capacity without adding a worker.`);
+        recommendations.push(`Alternatively, increasing check intervals (currently avg ${avgIntervalMin}m) to ~${suggested}m would reduce load without adding a worker.`);
       }
-    } else if (current.satPct < 25 && maxWorkers > 1) {
-      recommendations.push(`Workers are mostly idle (${current.satPct}% utilization). Reducing to ${maxWorkers - 1} worker(s) would free ~${Math.round(perWorkerRss / 1_048_576)} MB RAM with minimal impact.`);
-    } else if (current.satPct <= 90 && current.satPct >= 25) {
-      recommendations.push("Worker utilization is healthy. No changes needed.");
+    } else if (hasHistory && history.peakActive < maxWorkers && maxWorkers > 1) {
+      // Peak never reached max workers — safe to suggest reducing
+      const ramSaved = Math.round(perWorkerRss / 1_048_576);
+      recommendations.push(`Peak observed concurrency was ${history.peakActive}/${maxWorkers} workers over the last 3 days. Reducing to ${history.peakActive || maxWorkers - 1} worker(s) would free ~${ramSaved} MB RAM with no impact on throughput.`);
+    } else if (history.queueEvents === 0) {
+      const peakNote = hasHistory ? ` Peak observed concurrency was ${history.peakActive}/${maxWorkers} workers.` : "";
+      recommendations.push(`Queue depth has been 0 throughout the period — system is well-sized.${peakNote}`);
     }
 
     const scenarios = [...(minus1 ? [minus1] : []), current, plus1];
@@ -499,6 +513,9 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: ApiDeps): 
       currentQueueDepth: deps.scheduler.queueDepth,
       tasksPerHour: Math.round(tasksPerHour * 10) / 10,
       maxWorkers,
+      peakActive: history.peakActive,
+      queueEvents: history.queueEvents,
+      historySampleCount: history.sampleCount,
     });
     return;
   }
