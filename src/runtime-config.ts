@@ -27,6 +27,7 @@ const RunnerSchema = z
     logRetentionDays: z.number().int().positive().default(7),
     resultsRetentionDays: z.number().int().positive().default(180),
     lighthouseReportRetentionDays: z.number().int().positive().default(7),
+    workerStatsRetentionDays: z.number().int().positive().default(3),
   })
   .default({});
 

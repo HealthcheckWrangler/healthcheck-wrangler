@@ -2,7 +2,7 @@ import type postgres from "postgres";
 
 export async function initSchema(
   sql: postgres.Sql,
-  retentionDays: { logs: number; results: number },
+  retentionDays: { logs: number; results: number; workerStats: number },
 ): Promise<void> {
   // healthchecks history
   await sql`
@@ -127,23 +127,14 @@ export async function initSchema(
   await sql`SELECT create_hypertable('worker_stats', by_range('ts'), if_not_exists => TRUE)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_worker_stats_ts ON worker_stats(ts DESC)`;
 
-  // Retention policies — only add if not already present
-  await applyRetention(sql, "healthchecks",      retentionDays.results);
-  await applyRetention(sql, "lighthouse_results", retentionDays.results);
-  await applyRetention(sql, "logs",               retentionDays.logs);
-  await applyRetention(sql, "worker_stats",       retentionDays.results);
+  // Retention policies — upsert on every startup so config changes take effect
+  await applyRetention(sql, "healthchecks",       retentionDays.results);
+  await applyRetention(sql, "lighthouse_results",  retentionDays.results);
+  await applyRetention(sql, "logs",                retentionDays.logs);
+  await applyRetention(sql, "worker_stats",        retentionDays.workerStats);
 }
 
 async function applyRetention(sql: postgres.Sql, table: string, days: number): Promise<void> {
-  const existing = await sql`
-    SELECT 1 FROM timescaledb_information.jobs
-    WHERE hypertable_name = ${table}
-      AND proc_name = 'policy_retention'
-    LIMIT 1
-  `;
-  if (existing.length === 0) {
-    await sql`
-      SELECT add_retention_policy(${table}, INTERVAL '1 day' * ${days}, if_not_exists => TRUE)
-    `;
-  }
+  await sql`SELECT remove_retention_policy(${table}, if_exists => TRUE)`;
+  await sql`SELECT add_retention_policy(${table}, INTERVAL '1 day' * ${days})`;
 }

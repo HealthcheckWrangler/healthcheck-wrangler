@@ -63,6 +63,7 @@ runner:
   logRetentionDays: 7          # structured log entries (7 days is usually plenty for debugging)
   resultsRetentionDays: 180    # healthcheck + Lighthouse result history (6 months)
   lighthouseReportRetentionDays: 7  # HTML/JSON report files on disk (these are large; keep short)
+  workerStatsRetentionDays: 3  # worker utilization samples (1 row/min; 3 days matches the UI window)
 
 healthcheck:
   # How often to run healthchecks. Per-site YAML can override with intervalMinutes.

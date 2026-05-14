@@ -57,8 +57,9 @@ async function main(): Promise<void> {
   if (isDatabaseConfigured()) {
     sql = getClient();
     await initSchema(sql, {
-      logs: config.runner.logRetentionDays,
-      results: config.runner.resultsRetentionDays,
+      logs:        config.runner.logRetentionDays,
+      results:     config.runner.resultsRetentionDays,
+      workerStats: config.runner.workerStatsRetentionDays,
     });
     initLogDb(sql);
     results = new ResultsStore(sql);
